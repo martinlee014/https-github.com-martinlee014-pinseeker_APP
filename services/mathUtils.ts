@@ -1,0 +1,148 @@
+import { LatLng } from '../types';
+
+const EARTH_RADIUS = 6378137.0; // Meters
+
+const toRad = (deg: number) => (deg * Math.PI) / 180;
+const toDeg = (rad: number) => (rad * 180) / Math.PI;
+
+export const calculateDistance = (p1: LatLng, p2: LatLng): number => {
+  const dLat = toRad(p2.lat - p1.lat);
+  const dLon = toRad(p2.lng - p1.lng);
+  const lat1 = toRad(p1.lat);
+  const lat2 = toRad(p2.lat);
+
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.sin(dLon / 2) * Math.sin(dLon / 2) * Math.cos(lat1) * Math.cos(lat2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return EARTH_RADIUS * c;
+};
+
+export const calculateBearing = (start: LatLng, end: LatLng): number => {
+  const lat1 = toRad(start.lat);
+  const lat2 = toRad(end.lat);
+  const dLon = toRad(end.lng - start.lng);
+
+  const y = Math.sin(dLon) * Math.cos(lat2);
+  const x =
+    Math.cos(lat1) * Math.sin(lat2) -
+    Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+  const brng = toDeg(Math.atan2(y, x));
+  return (brng + 360) % 360;
+};
+
+export const calculateDestination = (start: LatLng, distanceMeters: number, bearingDegrees: number): LatLng => {
+  const radLat = toRad(start.lat);
+  const radLon = toRad(start.lng);
+  const radBearing = toRad(bearingDegrees);
+  const angularDist = distanceMeters / EARTH_RADIUS;
+
+  const endLat = Math.asin(
+    Math.sin(radLat) * Math.cos(angularDist) +
+    Math.cos(radLat) * Math.sin(angularDist) * Math.cos(radBearing)
+  );
+
+  const endLon = radLon + Math.atan2(
+    Math.sin(radBearing) * Math.sin(angularDist) * Math.cos(radLat),
+    Math.cos(angularDist) - Math.sin(radLat) * Math.sin(endLat)
+  );
+
+  return {
+    lat: toDeg(endLat),
+    lng: toDeg(endLon),
+  };
+};
+
+export const calculateWindAdjustedShot = (
+  start: LatLng,
+  baseDistance: number,
+  bearing: number,
+  windSpeed: number,
+  windDir: number
+): { destination: LatLng; playsLike: number } => {
+  const relativeWindAngle = (windDir - bearing + 180) % 360;
+  const windRad = toRad(relativeWindAngle);
+  
+  // Simple physics model
+  const headWindComp = windSpeed * Math.cos(windRad);
+  const crossWindComp = windSpeed * Math.sin(windRad);
+  
+  // Effect coefficients (simplified)
+  const distEffect = headWindComp * 0.01 * baseDistance; 
+  const sideEffect = crossWindComp * 0.005 * baseDistance;
+  
+  const newDistance = baseDistance - distEffect;
+  const bearingShift = toDeg(Math.atan2(sideEffect, newDistance));
+  
+  return {
+    destination: calculateDestination(start, newDistance, bearing + bearingShift),
+    playsLike: newDistance
+  };
+};
+
+export const getEllipsePoints = (center: LatLng, width: number, height: number, rotation: number): LatLng[] => {
+  const points: LatLng[] = [];
+  const rotationRad = toRad(rotation);
+  const segments = 36;
+
+  for (let i = 0; i <= segments; i++) {
+    const theta = (i / segments) * 2 * Math.PI;
+    const dx = (width / 2) * Math.cos(theta);
+    const dy = (height / 2) * Math.sin(theta);
+    
+    const rx = dx * Math.cos(rotationRad) - dy * Math.sin(rotationRad);
+    const ry = dx * Math.sin(rotationRad) + dy * Math.cos(rotationRad);
+    
+    // Convert back to LatLng (approximate using meters to degrees)
+    const dLat = ry / EARTH_RADIUS;
+    const dLon = rx / (EARTH_RADIUS * Math.cos(toRad(center.lat)));
+    
+    points.push({
+      lat: center.lat + toDeg(dLat),
+      lng: center.lng + toDeg(dLon)
+    });
+  }
+  return points;
+};
+
+// Generate curved points for trajectory (Quadratic Bezier)
+export const getArcPoints = (start: LatLng, end: LatLng): LatLng[] => {
+  const points: LatLng[] = [];
+  const numPoints = 20;
+  
+  // Calculate a control point to create the curve
+  // We place it at the midpoint, offset slightly to the side to simulate a visual arc
+  // For a "vertical" flight look on a 2D map, standard convention is just a straight line
+  // But user requested "arc/curve". We will do a slight "Draw" shape (curve left).
+  
+  const midLat = (start.lat + end.lat) / 2;
+  const midLng = (start.lng + end.lng) / 2;
+  
+  // Create an offset perpendicular to the path
+  const bearing = calculateBearing(start, end);
+  const dist = calculateDistance(start, end);
+  
+  // Offset depends on distance. E.g. 5% of distance.
+  const offsetMeters = dist * 0.1; 
+  
+  // Control point is midpoint shifted 90 degrees relative to bearing
+  // Visual effect: A slight curve
+  const controlPoint = calculateDestination({lat: midLat, lng: midLng}, offsetMeters, bearing - 90);
+
+  for (let i = 0; i <= numPoints; i++) {
+    const t = i / numPoints;
+    // Quadratic Bezier: B(t) = (1-t)^2 * P0 + 2(1-t)t * P1 + t^2 * P2
+    const lat = (1 - t) * (1 - t) * start.lat + 2 * (1 - t) * t * controlPoint.lat + t * t * end.lat;
+    const lng = (1 - t) * (1 - t) * start.lng + 2 * (1 - t) * t * controlPoint.lng + t * t * end.lng;
+    points.push({ lat, lng });
+  }
+  
+  return points;
+};
+
+export const formatDistance = (meters: number, useYards: boolean): string => {
+  if (useYards) {
+    return `${Math.round(meters * 1.09361)}yd`;
+  }
+  return `${Math.round(meters)}m`;
+};
