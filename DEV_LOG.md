@@ -1,11 +1,35 @@
 # PinSeeker Web - Development Log
 
+## Version: V6.0
+**Date:** 2024-05-23
+**Branch:** `V6.0`
+**Summary:** 新增球杆管理系统与落点可视化，修复交互Bug (Added Club Management System & Dispersion Visualization, Fixed Interaction Bugs)
+
+### 1. 新特性 (New Features)
+- **球杆管理 (Club Management)**:
+  - 在设置菜单中新增入口。
+  - 支持添加、编辑、删除球杆。
+  - **落点可视化 (Dispersion Visualizer)**: 新增 SVG 网络坐标系编辑器，可视化调整球杆的左右偏差 (Width Scatter) 和距离偏差 (Depth Scatter)。
+  - **全局应用**: 设置中的球杆数据实时同步至打球策略 (Strategy Engine) 和地图落点预测 (Predicted Landing Zone)。
+- **用户手册更新**: 增加了球杆管理相关的使用说明。
+
+### 2. 问题修复 (Bug Fixes)
+- **确认击球无反应 (Unresponsive Confirm Shot)**:
+  - 修复了 `ModalOverlay` 的事件冒泡问题，导致点击 "Confirm" 按钮被 Backdrop 点击事件拦截。
+  - 增强了 `confirmShot` 函数的错误捕获和空值检查。
+- **渲染崩溃**:
+  - 修复了 `PlayRound` 组件在球洞数据未加载完成时尝试渲染地图导致的崩溃问题。
+
+### 3. 代码重构 (Refactoring)
+- **Global Context**: 将球杆数据 (`bag`) 移至全局 Context，替换了原有的硬编码 `DEFAULT_BAG` 常量。
+- **Storage Service**: 增加了 `getBag/saveBag` 接口用于持久化用户自定义球杆数据。
+
+---
+
 ## Version: V5.0
 **Date:** 2024-05-22
 **Branch:** `V5.0`
 **Summary:** 修复复盘问题，重构代码 (Fix replay issues, refactor code)
-
----
 
 ## 1. 问题记录 (Issues Reported)
 
@@ -58,6 +82,15 @@
 
 ---
 
-## 3. 下一步计划 (Next Steps)
+## 3. 部署注意事项 (Deployment Note)
+
+**重要**: 
+为了确保 GPS 功能 (`navigator.geolocation`) 在移动端浏览器（Safari/Chrome）中正常工作，必须使用 **HTTPS** 协议部署应用。
+- **推荐**: 使用 Vercel 或 Netlify 进行托管。
+- **本地调试**: 局域网 HTTP 地址可能会被浏览器阻止获取位置权限。
+
+---
+
+## 4. 下一步计划 (Next Steps)
 - 验证所有 18 洞的 GPS 记录功能。
 - 测试离线状态下的数据持久化。

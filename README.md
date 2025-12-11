@@ -1,20 +1,48 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# PinSeeker Web
 
-# Run and deploy your AI Studio app
+**PinSeeker** is a professional Golf Analytics and Strategy Application providing satellite mapping, shot dispersion analysis, and round tracking. It is built with React, Leaflet, and Tailwind CSS.
 
-This contains everything you need to run your app locally.
+## 🚀 Features
 
-View your app in AI Studio: https://ai.studio/apps/drive/1e3WPe1wAnjgZEL7sD9Ght04D5rXycVf3
+- **Satellite Mapping**: View detailed hole layouts using ESRI World Imagery.
+- **Shot Tracking**: Record shots using GPS or manual placement.
+- **Dispersion Analysis**: Visualize expected landing zones based on club statistics and wind conditions.
+- **Replay Mode**: Review past rounds shot-by-shot.
+- **Scorecard**: Track strokes, putts, and penalties.
 
-## Run Locally
+## 📱 Important: Mobile & GPS Support
 
-**Prerequisites:**  Node.js
+**Crucial**: To use the GPS Location features (`navigator.geolocation`) on a mobile device (iOS/Android), this application **must be served over HTTPS**.
 
+Mobile browsers block GPS access on insecure (HTTP) connections (except for `localhost` on the device itself).
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+### Recommended Deployment (Free & Automatic HTTPS)
+
+#### Option 1: Vercel (Easiest)
+1. Push this code to GitHub.
+2. Import the repository on [Vercel](https://vercel.com).
+3. Vercel automatically detects the build settings. Click **Deploy**.
+4. Use the provided `https://...vercel.app` link on your phone.
+
+#### Option 2: GitHub Pages
+1. Ensure `react-router-dom` is using `HashRouter` (Already configured in `App.tsx`).
+2. Add `"homepage": "https://<username>.github.io/pinseeker_web"` to `package.json`.
+3. Run `npm install gh-pages --save-dev`.
+4. Add `"deploy": "gh-pages -d dist"` to scripts in `package.json`.
+5. Run `npm run deploy`.
+
+## 🛠 Local Development
+
+```bash
+# Install dependencies
+npm install
+
+# Run locally
+npm run dev
+```
+
+*Note: If testing on mobile via local network IP (e.g., `http://192.168.1.5:5173`), GPS will likely NOT work due to browser security policies. Use the deployment options above for real device testing.*
+
+## 📜 Version History
+
+See [DEV_LOG.md](./DEV_LOG.md) for detailed development logs, bug fixes, and refactoring notes.

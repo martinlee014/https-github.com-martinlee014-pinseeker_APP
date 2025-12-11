@@ -1,14 +1,13 @@
-import React, { useContext, useEffect, useState, useRef } from 'react';
+import { useContext, useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppContext } from '../App';
 import { StorageService } from '../services/storage';
 import { RoundHistory } from '../types';
-import { Plus, ChevronRight, Trophy, Calendar, MapPin, Play, RefreshCw, XCircle } from 'lucide-react';
-import * as MathUtils from '../services/mathUtils';
+import { Plus, ChevronRight, Trophy, Calendar, MapPin, Play, RefreshCw } from 'lucide-react';
 import { ModalOverlay } from '../components/Modals';
 
 const Dashboard = () => {
-  const { user, useYards } = useContext(AppContext);
+  const { user } = useContext(AppContext);
   const navigate = useNavigate();
   const [history, setHistory] = useState<RoundHistory[]>([]);
   const [showResumeModal, setShowResumeModal] = useState(false);

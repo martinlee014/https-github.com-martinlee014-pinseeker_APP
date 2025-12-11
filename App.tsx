@@ -1,10 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { HashRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
-import { User, LogOut, History, Play, Map as MapIcon, Settings as SettingsIcon, BookOpen } from 'lucide-react';
+import { User, LogOut, Play, Map as MapIcon, Settings as SettingsIcon } from 'lucide-react';
 import { StorageService } from './services/storage';
-import { DUVENHOF_HOLES, DEFAULT_BAG } from './constants';
-import { RoundHistory, GolfHole, HoleScore, ShotRecord, ClubStats } from './types';
-import * as MathUtils from './services/mathUtils';
+import { ClubStats } from './types';
 
 // Pages
 import Login from './pages/Login';
@@ -13,26 +11,31 @@ import PlayRound from './pages/PlayRound';
 import RoundSummary from './pages/RoundSummary';
 import Settings from './pages/Settings';
 import UserManual from './pages/UserManual';
+import ClubManagement from './pages/ClubManagement';
 
-// Global Context for simple state sharing (could use React.Context, but passing props is fine for this size)
-export const AppContext = React.createContext<{
+// Global Context for simple state sharing
+export const AppContext = createContext<{
   user: string | null;
   login: (u: string) => void;
   logout: () => void;
   useYards: boolean;
   toggleUnits: () => void;
+  bag: ClubStats[];
+  updateBag: (newBag: ClubStats[]) => void;
 }>({
   user: null,
   login: () => {},
   logout: () => {},
   useYards: false,
   toggleUnits: () => {},
+  bag: [],
+  updateBag: () => {},
 });
 
-const MainLayout = ({ children }: { children?: React.ReactNode }) => {
+const MainLayout = ({ children }: { children?: ReactNode }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { logout } = React.useContext(AppContext);
+  const { logout } = useContext(AppContext);
 
   const isPlayMode = location.pathname.startsWith('/play');
 
@@ -91,6 +94,12 @@ const NavItem = ({ icon, label, path, active }: any) => {
 const App = () => {
   const [user, setUser] = useState<string | null>(StorageService.getCurrentUser());
   const [useYards, setUseYards] = useState<boolean>(StorageService.getUseYards());
+  const [bag, setBag] = useState<ClubStats[]>([]);
+
+  // Load bag on mount
+  useEffect(() => {
+    setBag(StorageService.getBag());
+  }, []);
 
   const login = (username: string) => {
     setUser(username);
@@ -108,8 +117,13 @@ const App = () => {
     StorageService.setUseYards(newVal);
   };
 
+  const updateBag = (newBag: ClubStats[]) => {
+    setBag(newBag);
+    StorageService.saveBag(newBag);
+  };
+
   return (
-    <AppContext.Provider value={{ user, login, logout, useYards, toggleUnits }}>
+    <AppContext.Provider value={{ user, login, logout, useYards, toggleUnits, bag, updateBag }}>
       <HashRouter>
         <Routes>
           <Route path="/" element={user ? <Navigate to="/dashboard" /> : <Login />} />
@@ -117,6 +131,7 @@ const App = () => {
           <Route path="/play" element={<ProtectedRoute user={user}><MainLayout><PlayRound /></MainLayout></ProtectedRoute>} />
           <Route path="/summary" element={<ProtectedRoute user={user}><MainLayout><RoundSummary /></MainLayout></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute user={user}><MainLayout><Settings /></MainLayout></ProtectedRoute>} />
+          <Route path="/settings/clubs" element={<ProtectedRoute user={user}><MainLayout><ClubManagement /></MainLayout></ProtectedRoute>} />
           <Route path="/manual" element={<ProtectedRoute user={user}><MainLayout><UserManual /></MainLayout></ProtectedRoute>} />
         </Routes>
       </HashRouter>
@@ -124,7 +139,7 @@ const App = () => {
   );
 };
 
-const ProtectedRoute = ({ user, children }: { user: string | null, children?: React.ReactNode }) => {
+const ProtectedRoute = ({ user, children }: { user: string | null, children?: ReactNode }) => {
   if (!user) return <Navigate to="/" />;
   return <>{children}</>;
 };

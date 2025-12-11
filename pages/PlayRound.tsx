@@ -1,15 +1,15 @@
-import React, { useState, useEffect, useContext, useMemo, useRef } from 'react';
+import { useState, useEffect, useContext, useMemo, useRef, Fragment } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Polyline, Polygon, useMap, useMapEvents } from 'react-leaflet';
-import L, { LatLngBoundsExpression } from 'leaflet';
+import L from 'leaflet';
 import { AppContext } from '../App';
-import { DUVENHOF_HOLES, DEFAULT_BAG } from '../constants';
+import { DUVENHOF_HOLES } from '../constants';
 import { StorageService } from '../services/storage';
 import * as MathUtils from '../services/mathUtils';
 import { ClubStats, HoleScore, ShotRecord, RoundHistory, LatLng } from '../types';
 import ClubSelector from '../components/ClubSelector';
 import { ScoreModal, ShotConfirmModal, HoleSelectorModal, FullScorecardModal } from '../components/Modals';
-import { Flag, Navigation, Wind, ChevronLeft, Target, Grid, AlertCircle, RefreshCw, Compass, ListChecks, ArrowLeft, ArrowRight } from 'lucide-react';
+import { Flag, Navigation, Wind, ChevronLeft, Grid, RefreshCw, ListChecks, ArrowLeft, ArrowRight, BrainCircuit } from 'lucide-react';
 
 // --- Icons Setup ---
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -35,7 +35,6 @@ const targetIcon = new L.DivIcon({
   iconAnchor: [6, 6]
 });
 
-// Clean Start Marker (Replaces the realistic Tee)
 const startMarkerIcon = new L.DivIcon({
   className: 'custom-start-icon',
   html: `
@@ -52,7 +51,6 @@ const startMarkerIcon = new L.DivIcon({
   iconAnchor: [8, 8]
 });
 
-// Custom Ball Icon (Ball on Ground)
 const ballIcon = new L.DivIcon({
   className: 'custom-ball-icon',
   html: `
@@ -62,7 +60,6 @@ const ballIcon = new L.DivIcon({
   iconAnchor: [7, 7]
 });
 
-// Dynamic Replay Icon that accepts rotation to stay upright
 const createReplayLabelIcon = (text: string, rotation: number) => new L.DivIcon({
   className: 'custom-label-icon',
   html: `
@@ -80,11 +77,9 @@ const createReplayLabelIcon = (text: string, rotation: number) => new L.DivIcon(
     '>
       ${text}
     </div>`,
-  iconSize: [0, 0], // Size 0 so anchor is exactly at point
+  iconSize: [0, 0], 
   iconAnchor: [0, 0] 
 });
-
-// --- Map Helpers ---
 
 const RotatedMapHandler = ({ rotation }: { rotation: number }) => {
   const map = useMap();
@@ -116,7 +111,6 @@ const RotatedMapHandler = ({ rotation }: { rotation: number }) => {
       const deltaX = currentPos.x - lastPos.current.x;
       const deltaY = currentPos.y - lastPos.current.y;
 
-      // Apply inverse rotation to drag vector
       const theta = -rotation * (Math.PI / 180); 
       const rotatedDx = deltaX * Math.cos(theta) - deltaY * Math.sin(theta);
       const rotatedDy = deltaX * Math.sin(theta) + deltaY * Math.cos(theta);
@@ -150,15 +144,11 @@ const RotatedMapHandler = ({ rotation }: { rotation: number }) => {
   return null;
 };
 
-// Controls view fitting. 
-// In Play Mode: Centers on Ball.
-// In Replay Mode: Fits bounds to show Tee, Green, and all Shots.
 const MapInitializer = ({ center, isReplay, pointsToFit }: { center: LatLng, isReplay: boolean, pointsToFit?: LatLng[] }) => {
     const map = useMap();
     
     useEffect(() => {
         if (isReplay && pointsToFit && pointsToFit.length > 0) {
-            // Calculate bounds
             let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180;
             pointsToFit.forEach(p => {
                 if (p.lat < minLat) minLat = p.lat;
@@ -167,7 +157,6 @@ const MapInitializer = ({ center, isReplay, pointsToFit }: { center: LatLng, isR
                 if (p.lng > maxLng) maxLng = p.lng;
             });
             
-            // Add some padding
             const bounds = L.latLngBounds(
                 L.latLng(minLat, minLng),
                 L.latLng(maxLat, maxLng)
@@ -175,10 +164,9 @@ const MapInitializer = ({ center, isReplay, pointsToFit }: { center: LatLng, isR
             
             map.fitBounds(bounds, { padding: [50, 50], animate: false });
         } else {
-            // Standard Play Mode behavior
             map.setView([center.lat, center.lng], 18, { animate: false });
         }
-    }, [center, isReplay, map, pointsToFit]); // Dependency array ensures this runs when inputs change
+    }, [center, isReplay, map, pointsToFit]);
     return null;
 }
 
@@ -190,48 +178,50 @@ const MapEvents = ({ onMapClick, onMapLongPress }: any) => {
   return null;
 };
 
-// --- Main Component ---
-
 const PlayRound = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, useYards } = useContext(AppContext);
+  const { user, useYards, bag } = useContext(AppContext);
 
-  // Setup
   const replayRound = location.state?.round as RoundHistory | undefined;
   const initialHoleIdx = location.state?.initialHoleIndex || 0;
   const isReplay = !!replayRound;
 
-  // State
   const [currentHoleIdx, setCurrentHoleIdx] = useState(initialHoleIdx);
   const [shots, setShots] = useState<ShotRecord[]>([]);
   const [scorecard, setScorecard] = useState<HoleScore[]>([]);
   
-  const [currentBallPos, setCurrentBallPos] = useState<LatLng>(DUVENHOF_HOLES[initialHoleIdx].tee);
-  const [selectedClub, setSelectedClub] = useState<ClubStats>(DEFAULT_BAG[0]);
+  const [currentBallPos, setCurrentBallPos] = useState<LatLng>(DUVENHOF_HOLES[initialHoleIdx]?.tee || { lat: 0, lng: 0 });
+  const [selectedClub, setSelectedClub] = useState<ClubStats>(bag[0] || { name: 'Driver', carry: 230, sideError: 45, depthError: 25 });
   const [aimAngle, setAimAngle] = useState(0);
   const [shotNum, setShotNum] = useState(1);
   
-  // Modals & Confirmation
   const [showHoleSelect, setShowHoleSelect] = useState(false);
   const [showScoreModal, setShowScoreModal] = useState(false);
   const [showFullCard, setShowFullCard] = useState(false);
   const [pendingShot, setPendingShot] = useState<{ pos: LatLng, isGPS: boolean, dist: number } | null>(null);
   
-  // Environment
   const [windSpeed, setWindSpeed] = useState(5);
   const [windDir, setWindDir] = useState(180);
   const [showWind, setShowWind] = useState(false);
 
   const hole = DUVENHOF_HOLES[currentHoleIdx];
 
-  // --- Initialization (Run Once) ---
+  // If bag updates (e.g. from settings), ensure selected club is valid or reset
+  useEffect(() => {
+    if (bag.length > 0) {
+      const exists = bag.find(c => c.name === selectedClub.name);
+      if (!exists) setSelectedClub(bag[0]);
+    }
+  }, [bag]);
+
   useEffect(() => {
     if (isReplay && replayRound) {
       setShots(replayRound.shots);
       setScorecard(replayRound.scorecard);
-      // For Replay, default to tee is fine, but MapInitializer will handle bounds fitting
-      setCurrentBallPos(DUVENHOF_HOLES[initialHoleIdx].tee);
+      if(DUVENHOF_HOLES[initialHoleIdx]) {
+        setCurrentBallPos(DUVENHOF_HOLES[initialHoleIdx].tee);
+      }
     } else {
       const searchParams = new URLSearchParams(location.search);
       if (searchParams.get('restore') === 'true' && user) {
@@ -244,11 +234,9 @@ const PlayRound = () => {
           setCurrentBallPos(saved.currentBallPos);
         }
       }
-      // If not restore, state defaults are already correct (Hole 0, Tee 0)
     }
-  }, []); // Empty dependency array: Run ONCE on mount
+  }, []);
 
-  // Persistence
   useEffect(() => {
     if (!isReplay && user) {
       StorageService.saveTempState(user, {
@@ -261,7 +249,8 @@ const PlayRound = () => {
     }
   }, [currentHoleIdx, shotNum, currentBallPos, scorecard, shots, isReplay, user]);
 
-  // Calculations
+  if (!hole) return <div className="p-10 text-white">Loading Hole Data...</div>;
+
   const distToGreen = useMemo(() => MathUtils.calculateDistance(currentBallPos, hole.green), [currentBallPos, hole]);
   const baseBearing = useMemo(() => MathUtils.calculateBearing(currentBallPos, hole.green), [currentBallPos, hole]);
   const shotBearing = baseBearing + aimAngle;
@@ -280,6 +269,10 @@ const PlayRound = () => {
     MathUtils.calculateDistance(predictedLanding, hole.green), 
   [predictedLanding, hole]);
 
+  const strategy = useMemo(() => 
+    MathUtils.getStrategyRecommendation(distLandingToGreen, bag, useYards),
+  [distLandingToGreen, useYards, bag]);
+
   const ellipsePoints = useMemo(() => MathUtils.getEllipsePoints(
     predictedLanding, 
     selectedClub.sideError, 
@@ -287,27 +280,24 @@ const PlayRound = () => {
     90 - shotBearing
   ).map(p => [p.lat, p.lng] as [number, number]), [predictedLanding, selectedClub, shotBearing]);
 
-  // Replay Points for auto-fitting
   const holeShots = useMemo(() => shots.filter(s => s.holeNumber === hole.number), [shots, hole.number]);
   const replayPoints = useMemo(() => {
       if (!isReplay) return [];
       return [hole.tee, hole.green, ...holeShots.map(s => s.to)];
   }, [isReplay, hole, holeShots]);
 
-  // Auto Club
   useEffect(() => {
-    if (!isReplay) {
+    if (!isReplay && bag.length > 0) {
       const dist = distToGreen;
       if (dist < 50) {
-        setSelectedClub(DEFAULT_BAG[DEFAULT_BAG.length - 1]); 
+        // Use smallest club
+        setSelectedClub(bag[bag.length - 1]); 
       } else {
-        const suitable = [...DEFAULT_BAG].reverse().find(c => c.carry >= dist - 10);
-        setSelectedClub(suitable || DEFAULT_BAG[0]); 
+        const suitable = [...bag].reverse().find(c => c.carry >= dist - 10);
+        setSelectedClub(suitable || bag[0]); 
       }
     }
   }, [currentBallPos, currentHoleIdx, isReplay]);
-
-  // --- Interaction Handlers ---
 
   const handleMapClick = (latlng: any) => {
     if (isReplay) return;
@@ -342,20 +332,37 @@ const PlayRound = () => {
   };
 
   const confirmShot = () => {
-    if (!pendingShot) return;
-    const newShot: ShotRecord = {
-      holeNumber: hole.number,
-      shotNumber: shotNum,
-      from: currentBallPos,
-      to: pendingShot.pos,
-      clubUsed: selectedClub.name,
-      distance: pendingShot.dist
-    };
-    setShots(prev => [...prev, newShot]);
-    setCurrentBallPos(pendingShot.pos);
-    setShotNum(prev => prev + 1);
-    setPendingShot(null);
-    setAimAngle(0);
+    if (!pendingShot) {
+      console.error("No pending shot to confirm");
+      return;
+    }
+    
+    // Ensure we have a valid hole. If not, fallback to currentHoleIdx lookup if possible
+    const targetHole = hole || DUVENHOF_HOLES[currentHoleIdx];
+    if (!targetHole) {
+      alert("Error: Hole data missing.");
+      return;
+    }
+
+    try {
+        const newShot: ShotRecord = {
+          holeNumber: targetHole.number,
+          shotNumber: shotNum,
+          from: currentBallPos || targetHole.tee, // Fallback if pos is lost
+          to: pendingShot.pos,
+          clubUsed: selectedClub.name,
+          distance: pendingShot.dist
+        };
+        
+        setShots(prev => [...prev, newShot]);
+        setCurrentBallPos(pendingShot.pos);
+        setShotNum(prev => prev + 1);
+        setAimAngle(0);
+        setPendingShot(null); // Ensure this is called to close modal
+    } catch(err) {
+        console.error("Error saving shot:", err);
+        alert("Failed to save shot. See console.");
+    }
   };
 
   const setTeeToGPS = () => {
@@ -410,11 +417,8 @@ const PlayRound = () => {
     navigate('/summary', { state: { round: history } });
   };
 
-  // --- Rendering ---
-
   return (
     <div className="h-full relative bg-gray-900 flex flex-col overflow-hidden">
-      {/* Header Overlay */}
       <div className="absolute top-0 left-0 right-0 z-[1000] p-3 bg-gradient-to-b from-black/90 to-transparent flex justify-between items-start pointer-events-none">
         <div className="pointer-events-auto flex flex-col gap-2">
            <button onClick={() => navigate(-1)} className="bg-black/50 p-2 rounded-full text-white backdrop-blur-sm">
@@ -453,7 +457,6 @@ const PlayRound = () => {
         </div>
       </div>
 
-      {/* Wind Panel */}
       {showWind && (
         <div className="absolute top-20 right-14 z-[1000] bg-black/80 backdrop-blur p-3 rounded-xl border border-gray-700 w-40 text-xs text-gray-300">
             <div className="mb-1 flex justify-between"><span>Speed</span> <span>{windSpeed} m/s</span></div>
@@ -463,7 +466,6 @@ const PlayRound = () => {
         </div>
       )}
 
-      {/* Map Container Wrapper with Rotation */}
       <div className="flex-1 relative z-0 overflow-hidden bg-black w-full h-full">
         <div 
             style={{ 
@@ -474,9 +476,6 @@ const PlayRound = () => {
             }}
         >
             <MapContainer 
-                // CRITICAL FIX: Adding key={currentHoleIdx} forces the Map to completely unmount and remount 
-                // when switching holes. This prevents the "Shake" effect caused by CSS rotation conflicts 
-                // with Leaflet's internal positioning system during major view transitions.
                 key={currentHoleIdx}
                 center={[hole.tee.lat, hole.tee.lng]} 
                 zoom={18} 
@@ -505,61 +504,47 @@ const PlayRound = () => {
                   const startIcon = s.shotNumber === 1 ? startMarkerIcon : ballIcon;
 
                   return (
-                    <React.Fragment key={i}>
+                    <Fragment key={i}>
                         <Marker position={[s.from.lat, s.from.lng]} icon={startIcon} />
-                        
-                        {/* Shadow: Straight line on the ground */}
                         <Polyline 
                           positions={[[s.from.lat, s.from.lng], [s.to.lat, s.to.lng]]} 
                           color="black" 
                           weight={4} 
                           opacity={0.3} 
                         />
-                        
-                        {/* Flight: Curved line */}
                         <Polyline 
                           positions={curvePoints.map(p => [p.lat, p.lng])} 
                           color="white" 
                           weight={2} 
                           opacity={0.8} 
                         />
-                        
                         {isReplay ? (
                             <Marker 
                               position={[s.to.lat, s.to.lng]} 
-                              // Pass the NEGATIVE of map rotation to counter-rotate the text
                               icon={createReplayLabelIcon(`${s.clubUsed} - ${MathUtils.formatDistance(s.distance, useYards)}`, -mapRotation)} 
                             />
                         ) : (
                             <Marker position={[s.to.lat, s.to.lng]} icon={targetIcon} />
                         )}
-                    </React.Fragment>
+                    </Fragment>
                   );
               })}
 
               {!isReplay && (
                   <>
-                      {/* Use appropriate icon for current position based on shot number */}
                       <Marker position={[currentBallPos.lat, currentBallPos.lng]} icon={shotNum === 1 ? startMarkerIcon : ballIcon} />
-                      
-                      {/* Shadow for planned shot */}
                       <Polyline 
                           positions={[[currentBallPos.lat, currentBallPos.lng], [predictedLanding.lat, predictedLanding.lng]]} 
                           color="black" weight={4} opacity={0.2} 
                       />
-                      
-                      {/* Arc for planned shot */}
                       <Polyline 
                           positions={MathUtils.getArcPoints(currentBallPos, predictedLanding).map(p => [p.lat, p.lng])} 
                           color="#3b82f6" weight={3} 
                       />
-
-                      {/* Line to Green (Ground) */}
                       <Polyline 
                           positions={[[predictedLanding.lat, predictedLanding.lng], [hole.green.lat, hole.green.lng]]} 
                           color="#fbbf24" weight={2} dashArray="4,4"
                       />
-
                       <Polygon positions={ellipsePoints} pathOptions={{ color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.2, weight: 1 }} />
                       <Marker position={[predictedLanding.lat, predictedLanding.lng]} icon={targetIcon} />
                   </>
@@ -568,44 +553,80 @@ const PlayRound = () => {
         </div>
       </div>
 
-      {/* Bottom Controls */}
       {!isReplay ? (
         <div className="bg-gray-900 border-t border-gray-800 p-4 pb-8 space-y-4 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] z-10">
-            <div className="flex items-center justify-between">
-                <div className="text-gray-400 text-xs uppercase font-bold tracking-wider flex items-center gap-2">
+            <div className="flex items-center gap-4">
+                <div className="text-gray-400 text-xs uppercase font-bold tracking-wider flex items-center gap-2 whitespace-nowrap">
                    Shot {shotNum}
                    {shotNum === 1 && (
                      <button onClick={setTeeToGPS} className="text-blue-500 bg-blue-900/30 px-2 py-0.5 rounded text-[10px] flex items-center gap-1 border border-blue-900">
-                       <RefreshCw size={10} /> Set GPS
+                       <RefreshCw size={10} /> GPS
                      </button>
                    )}
                 </div>
-                <div className="flex flex-col items-end gap-1">
-                    <div className="flex items-center gap-2">
-                        <span className="text-blue-400 text-xs">Carry: </span>
-                        <span className="text-white font-bold text-sm">{MathUtils.formatDistance(playsLike, useYards)}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <span className="text-yellow-500 text-xs">Leave: </span>
-                        <span className="text-white font-bold text-sm">{MathUtils.formatDistance(distLandingToGreen, useYards)}</span>
-                    </div>
+                <div className="flex items-center gap-2 flex-1">
+                    <span className="text-xs font-bold text-gray-500">AIM</span>
+                    <input 
+                        type="range" min="-45" max="45" value={aimAngle} onChange={(e) => setAimAngle(parseInt(e.target.value))}
+                        className="flex-1 accent-green-500 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                    />
+                    <span className="text-xs font-bold text-white w-8 text-right">{aimAngle}°</span>
                 </div>
             </div>
             
-            <ClubSelector 
-                clubs={DEFAULT_BAG} 
-                selectedClub={selectedClub} 
-                onSelect={setSelectedClub} 
-                useYards={useYards}
-            />
+            <div className="flex gap-3 h-24">
+                <div className="flex-1 bg-gray-800 rounded-xl p-3 flex flex-col justify-between border border-gray-700 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 p-1 opacity-10">
+                      <BrainCircuit size={64} className="text-white"/>
+                    </div>
+                    
+                    <div className="z-10">
+                        <div className="text-[10px] text-gray-400 uppercase tracking-wider mb-0.5">Strategy</div>
+                        <div className="text-sm font-bold text-white leading-tight">{strategy.mainAction}</div>
+                        {strategy.subAction && (
+                           <div className="text-xs text-blue-400 mt-0.5">{strategy.subAction}</div>
+                        )}
+                    </div>
 
-            <div className="flex items-center gap-4">
-                <span className="text-xs font-bold text-gray-500 w-8">AIM</span>
-                <input 
-                    type="range" min="-45" max="45" value={aimAngle} onChange={(e) => setAimAngle(parseInt(e.target.value))}
-                    className="flex-1 accent-green-500 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                />
-                <span className="text-xs font-bold text-white w-8 text-right">{aimAngle}°</span>
+                    <div className="flex items-end gap-3 z-10 mt-1">
+                        <div>
+                           <div className="text-[10px] text-gray-500">Carry</div>
+                           <div className="text-white font-bold">{MathUtils.formatDistance(playsLike, useYards)}</div>
+                        </div>
+                        <div>
+                           <div className="text-[10px] text-yellow-600">Leave</div>
+                           <div className="text-yellow-400 font-bold">{MathUtils.formatDistance(distLandingToGreen, useYards)}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="w-[35%] flex flex-col gap-2">
+                    <div className="flex-1 relative">
+                        <div className="h-full">
+                           <ClubSelector 
+                                clubs={bag} 
+                                selectedClub={selectedClub} 
+                                onSelect={setSelectedClub} 
+                                useYards={useYards}
+                            />
+                            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center bg-green-600 rounded-xl shadow-lg border border-green-500">
+                                <span className="text-xs text-green-200 uppercase font-bold">Club</span>
+                                <span className="text-xl font-black text-white leading-none">{selectedClub.name}</span>
+                            </div>
+                             <style>{`
+                                .h-full select { 
+                                    opacity: 0; 
+                                    position: absolute; 
+                                    inset: 0; 
+                                    height: 100%; 
+                                    width: 100%; 
+                                    z-index: 10;
+                                    cursor: pointer;
+                                }
+                            `}</style>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <button 
@@ -614,10 +635,8 @@ const PlayRound = () => {
             >
                 <Navigation size={18} /> Record Shot (GPS)
             </button>
-            <div className="text-[10px] text-gray-600 text-center">Long press map for manual drop</div>
         </div>
       ) : (
-        /* Replay Mode Navigation Bar */
         <div className="bg-gray-900 border-t border-gray-800 p-4 pb-8 z-10 flex items-center justify-between">
            <button 
              onClick={() => currentHoleIdx > 0 && loadHole(currentHoleIdx - 1)}
@@ -639,7 +658,6 @@ const PlayRound = () => {
         </div>
       )}
 
-      {/* Modals */}
       {showHoleSelect && (
         <HoleSelectorModal 
            holes={DUVENHOF_HOLES} 
@@ -671,7 +689,7 @@ const PlayRound = () => {
         <ShotConfirmModal 
            dist={MathUtils.formatDistance(pendingShot.dist, useYards)}
            club={selectedClub}
-           clubs={DEFAULT_BAG}
+           clubs={bag}
            isGPS={pendingShot.isGPS}
            isLongDistWarning={pendingShot.dist > 500}
            onChangeClub={setSelectedClub}

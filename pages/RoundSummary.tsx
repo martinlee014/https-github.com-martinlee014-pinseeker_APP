@@ -1,8 +1,6 @@
-import React, { useContext } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { AppContext } from '../App';
-import { RoundHistory, HoleScore } from '../types';
-import { ChevronLeft, Share2, AlertCircle } from 'lucide-react';
+import { RoundHistory } from '../types';
+import { ChevronLeft, Share2 } from 'lucide-react';
 
 const RoundSummary = () => {
   const navigate = useNavigate();

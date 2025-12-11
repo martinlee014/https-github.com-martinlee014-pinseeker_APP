@@ -1,6 +1,6 @@
-import React, { useContext } from 'react';
+import { useContext } from 'react';
 import { AppContext } from '../App';
-import { BookOpen, Ruler } from 'lucide-react';
+import { BookOpen, Ruler, Briefcase } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const Settings = () => {
@@ -12,6 +12,7 @@ const Settings = () => {
       <h1 className="text-2xl font-bold text-white mb-6">Settings</h1>
 
       <div className="space-y-4">
+        {/* Unit Toggle */}
         <div className="bg-gray-900 rounded-xl p-4 flex items-center justify-between border border-gray-800">
             <div className="flex items-center gap-3">
                 <div className="bg-gray-800 p-2 rounded-lg">
@@ -30,6 +31,22 @@ const Settings = () => {
             </button>
         </div>
 
+        {/* Club Management */}
+        <button 
+            onClick={() => navigate('/settings/clubs')}
+            className="w-full bg-gray-900 rounded-xl p-4 flex items-center gap-3 border border-gray-800 hover:bg-gray-800 transition-colors group"
+        >
+            <div className="bg-gray-800 p-2 rounded-lg group-hover:bg-gray-700 transition-colors">
+                <Briefcase className="text-yellow-500" size={20} />
+            </div>
+            <div className="text-left flex-1">
+                <div className="font-medium text-white">Club Management</div>
+                <div className="text-xs text-gray-500">Edit bag, carry distances & dispersion</div>
+            </div>
+            <div className="text-gray-600 group-hover:text-white transition-colors">→</div>
+        </button>
+
+        {/* Manual */}
         <button 
             onClick={() => navigate('/manual')}
             className="w-full bg-gray-900 rounded-xl p-4 flex items-center gap-3 border border-gray-800 hover:bg-gray-800 transition-colors"
@@ -45,7 +62,7 @@ const Settings = () => {
       </div>
       
       <div className="text-center text-xs text-gray-600 mt-10">
-          PinSeeker Web v1.0.0
+          PinSeeker Web v6.0.0
       </div>
     </div>
   );

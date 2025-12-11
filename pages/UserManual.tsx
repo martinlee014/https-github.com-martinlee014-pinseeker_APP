@@ -1,4 +1,3 @@
-import React from 'react';
 import { ChevronLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -34,6 +33,17 @@ const UserManual = () => {
         </p>
 
         <Section 
+          title="Club Management (New!)"
+          items={[
+            'Go to Settings > Club Management to customize your golf bag.',
+            'Tap the "+" button to add a new club, or the Edit icon to modify an existing one.',
+            'Use the "Network Table" visualizer to define your dispersion. Adjust the "Width Scatter" (Left/Right miss) and "Depth Scatter" (Short/Long miss) sliders.',
+            'The blue ellipse on the grid represents your likely landing zone (68% confidence). This data is used to calculate strategy recommendations during your round.',
+            'Ensure "Carry" distances are accurate for the best club recommendations.'
+          ]}
+        />
+
+        <Section 
           title="Starting a Round"
           items={[
             'Tap the "START NEW ROUND" button on the main dashboard.',
@@ -46,7 +56,7 @@ const UserManual = () => {
           title="Playing a Hole"
           items={[
             'The map shows your current position (Blue), predicted landing zone (Target), and the Green (Red Flag).',
-            'Use the Club Selector at the bottom to choose your club. The dispersion ellipse (blue oval) updates automatically.',
+            'Use the Club Selector at the bottom to choose your club. The dispersion ellipse (blue oval) updates based on your Club Management settings.',
             'Use the "AIM" slider to adjust your shot direction relative to the pin.',
             'The "Plays Like" distance accounts for wind (simulate wind via the wind icon in top right).'
           ]}

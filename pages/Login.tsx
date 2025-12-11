@@ -1,11 +1,11 @@
-import React, { useState, useContext } from 'react';
+import { useState, useContext, FormEvent } from 'react';
 import { AppContext } from '../App';
 
 const Login = () => {
   const { login } = useContext(AppContext);
   const [name, setName] = useState('');
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = (e: FormEvent) => {
     e.preventDefault();
     if (name.trim()) {
       login(name.trim());

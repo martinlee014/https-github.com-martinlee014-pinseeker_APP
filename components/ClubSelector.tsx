@@ -1,6 +1,5 @@
-import React from 'react';
+import { FC } from 'react';
 import { ClubStats } from '../types';
-import * as MathUtils from '../services/mathUtils';
 
 interface ClubSelectorProps {
   clubs: ClubStats[];
@@ -9,7 +8,7 @@ interface ClubSelectorProps {
   useYards: boolean;
 }
 
-const ClubSelector: React.FC<ClubSelectorProps> = ({ clubs, selectedClub, onSelect, useYards }) => {
+const ClubSelector: FC<ClubSelectorProps> = ({ clubs, selectedClub, onSelect, useYards }) => {
   return (
     <div className="bg-gray-800 rounded-lg p-2 border border-gray-700">
       <select 

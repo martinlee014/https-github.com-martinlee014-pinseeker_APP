@@ -1,11 +1,23 @@
-import React from 'react';
-import { X, Check, AlertTriangle, MapPin, Flag, Trophy } from 'lucide-react';
+import { useState, ReactNode } from 'react';
+import { X, Check, AlertTriangle, MapPin, Trophy, Flag } from 'lucide-react';
 import { ClubStats, GolfHole, HoleScore } from '../types';
 
-export const ModalOverlay = ({ children, onClose }: { children?: React.ReactNode, onClose?: () => void }) => (
-  <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[2000] flex items-center justify-center p-4">
-    <div className="absolute inset-0" onClick={onClose} />
-    <div className="bg-gray-900 rounded-2xl border border-gray-700 w-full max-w-sm relative z-10 overflow-hidden shadow-2xl max-h-[90vh] flex flex-col">
+export const ModalOverlay = ({ children, onClose }: { children?: ReactNode, onClose?: () => void }) => (
+  <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4">
+    {/* Backdrop */}
+    <div 
+      className="absolute inset-0 bg-black/80 backdrop-blur-sm" 
+      onClick={(e) => {
+        e.preventDefault();
+        if(onClose) onClose();
+      }} 
+    />
+    
+    {/* Content Wrapper - Stops propagation to prevent closing when clicking inside */}
+    <div 
+      className="bg-gray-900 rounded-2xl border border-gray-700 w-full max-w-sm relative z-10 overflow-hidden shadow-2xl max-h-[90vh] flex flex-col pointer-events-auto"
+      onClick={(e) => e.stopPropagation()}
+    >
       {children}
     </div>
   </div>
@@ -22,16 +34,16 @@ export const ScoreModal = ({
   onSave: (putts: number, pens: number) => void, 
   onClose: () => void 
 }) => {
-  const [putts, setPutts] = React.useState(2);
-  const [pens, setPens] = React.useState(0);
+  const [putts, setPutts] = useState(2);
+  const [pens, setPens] = useState(0);
 
   const Stepper = ({ label, val, setVal }: any) => (
     <div className="flex items-center justify-between bg-gray-800 p-3 rounded-xl mb-3">
       <span className="text-gray-300 font-bold">{label}</span>
       <div className="flex items-center gap-4">
-        <button onClick={() => setVal(Math.max(0, val - 1))} className="w-8 h-8 rounded-full bg-gray-700 text-white font-bold">-</button>
+        <button type="button" onClick={() => setVal(Math.max(0, val - 1))} className="w-8 h-8 rounded-full bg-gray-700 text-white font-bold">-</button>
         <span className="w-6 text-center text-xl font-bold text-white">{val}</span>
-        <button onClick={() => setVal(val + 1)} className="w-8 h-8 rounded-full bg-green-600 text-white font-bold">+</button>
+        <button type="button" onClick={() => setVal(val + 1)} className="w-8 h-8 rounded-full bg-green-600 text-white font-bold">+</button>
       </div>
     </div>
   );
@@ -40,7 +52,7 @@ export const ScoreModal = ({
     <ModalOverlay onClose={onClose}>
       <div className="p-4 border-b border-gray-800 flex justify-between items-center bg-gray-800/50 shrink-0">
         <h3 className="text-lg font-bold text-white">Finish Hole {holeNum}</h3>
-        <button onClick={onClose}><X className="text-gray-400" /></button>
+        <button type="button" onClick={onClose}><X className="text-gray-400" /></button>
       </div>
       <div className="p-6 overflow-y-auto">
         <div className="text-center mb-6">
@@ -51,6 +63,7 @@ export const ScoreModal = ({
         <Stepper label="Penalties" val={pens} setVal={setPens} />
         
         <button 
+          type="button"
           onClick={() => onSave(putts, pens)}
           className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-xl mt-4 flex items-center justify-center gap-2"
         >
@@ -80,6 +93,9 @@ export const ShotConfirmModal = ({
   onChangeClub: (c: ClubStats) => void,
   isLongDistWarning: boolean
 }) => {
+  // Safety check to prevent render crashes if club is somehow null
+  if (!club) return null;
+
   return (
     <ModalOverlay onClose={onCancel}>
       <div className="p-4 bg-gray-800/50 border-b border-gray-800 shrink-0">
@@ -106,21 +122,38 @@ export const ShotConfirmModal = ({
 
         <div>
           <label className="text-xs text-gray-400 font-bold mb-1 block">Club Used</label>
-          <select 
-            className="w-full bg-gray-800 text-white p-3 rounded-lg outline-none border border-gray-700"
-            value={club.name}
-            onChange={(e) => {
-              const c = clubs.find(cl => cl.name === e.target.value);
-              if (c) onChangeClub(c);
-            }}
-          >
-            {clubs.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
-          </select>
+          <div className="relative">
+            <select 
+              className="w-full bg-gray-800 text-white p-3 rounded-lg outline-none border border-gray-700 appearance-none font-bold"
+              value={club.name}
+              onChange={(e) => {
+                const c = clubs.find(cl => cl.name === e.target.value);
+                if (c) onChangeClub(c);
+              }}
+            >
+              {clubs.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
+            </select>
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
+              <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+            </div>
+          </div>
         </div>
 
         <div className="flex gap-3 mt-4">
-          <button onClick={onCancel} className="flex-1 bg-gray-800 text-gray-300 py-3 rounded-xl font-bold">Cancel</button>
-          <button onClick={onConfirm} className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold">Confirm</button>
+          <button 
+            type="button" 
+            onClick={(e) => { e.preventDefault(); onCancel(); }} 
+            className="flex-1 bg-gray-800 text-gray-300 py-3 rounded-xl font-bold cursor-pointer hover:bg-gray-700 active:scale-95 transition-transform"
+          >
+            Cancel
+          </button>
+          <button 
+            type="button" 
+            onClick={(e) => { e.preventDefault(); onConfirm(); }} 
+            className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold cursor-pointer hover:bg-blue-500 active:scale-95 transition-transform shadow-lg shadow-blue-900/30"
+          >
+            Confirm
+          </button>
         </div>
       </div>
     </ModalOverlay>
@@ -136,6 +169,7 @@ export const HoleSelectorModal = ({ holes, currentIdx, onSelect, onClose }: { ho
       <div className="p-4 grid grid-cols-4 gap-3 overflow-y-auto">
         {holes.map((h, i) => (
           <button 
+            type="button"
             key={h.number}
             onClick={() => onSelect(i)}
             className={`aspect-square rounded-xl flex flex-col items-center justify-center border ${currentIdx === i ? 'bg-green-600 border-green-400 text-white' : 'bg-gray-800 border-gray-700 text-gray-400'}`}
@@ -176,7 +210,7 @@ export const FullScorecardModal = ({
         <h3 className="text-lg font-bold text-white flex items-center gap-2">
           <Trophy size={18} className="text-yellow-500"/> Scorecard
         </h3>
-        <button onClick={onClose}><X className="text-gray-400" /></button>
+        <button type="button" onClick={onClose}><X className="text-gray-400" /></button>
       </div>
       
       <div className="flex-1 overflow-y-auto p-4">
@@ -224,6 +258,7 @@ export const FullScorecardModal = ({
 
       <div className="p-4 border-t border-gray-800 shrink-0 bg-gray-900">
         <button 
+          type="button"
           onClick={onFinishRound}
           className="w-full bg-red-900/80 hover:bg-red-800 text-red-100 border border-red-700 font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-colors"
         >

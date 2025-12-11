@@ -1,11 +1,11 @@
-import React from 'react';
+import { ReactNode } from 'react';
 
 interface LayoutProps {
-  children: React.ReactNode;
+  children: ReactNode;
   className?: string;
 }
 
-const Layout: React.FC<LayoutProps> = ({ children, className = '' }) => {
+const Layout = ({ children, className = '' }: LayoutProps) => {
   return (
     <div className={`min-h-screen bg-black text-white flex flex-col font-sans ${className}`}>
       {children}

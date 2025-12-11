@@ -1,4 +1,4 @@
-import { LatLng } from '../types';
+import { LatLng, ClubStats } from '../types';
 
 const EARTH_RADIUS = 6378137.0; // Meters
 
@@ -145,4 +145,29 @@ export const formatDistance = (meters: number, useYards: boolean): string => {
     return `${Math.round(meters * 1.09361)}yd`;
   }
   return `${Math.round(meters)}m`;
+};
+
+export const getStrategyRecommendation = (
+  distanceToGreen: number, 
+  bag: ClubStats[], 
+  useYards: boolean
+): { mainAction: string; subAction?: string } => {
+  const unit = useYards ? 'yd' : 'm';
+  const val = useYards ? distanceToGreen * 1.09361 : distanceToGreen;
+  const dist = Math.round(val);
+
+  if (distanceToGreen < 5) {
+      return { mainAction: "Tap-In Range", subAction: "Excellent Shot!" };
+  }
+  if (distanceToGreen < 20) {
+      return { mainAction: "Short Game", subAction: "Up & Down probability high" };
+  }
+  if (distanceToGreen >= 80 && distanceToGreen <= 110) {
+      return { mainAction: "Perfect Layup", subAction: `Leaves full wedge (${dist}${unit})` };
+  }
+  if (distanceToGreen > 220) {
+      return { mainAction: "Safe Drive", subAction: "Focus on fairway hit" };
+  }
+  
+  return { mainAction: "Approach", subAction: `Leaves ${dist}${unit} to pin` };
 };
