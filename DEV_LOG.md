@@ -1,5 +1,16 @@
 # PinSeeker Web - Development Log
 
+## Version: V7.6.0 (Visual Wind Vane)
+**Date:** 2024-05-28
+**Branch:** `main`
+**Status:** ✅ RELEASED
+
+### Features
+- **Visual Wind Vane Control**: Replaced the abstract wind direction slider with an interactive, visual compass interface.
+  - **Compass Ring**: A 360-degree interactive ring. Tap or drag to set wind direction relative to the screen/shot.
+  - **True North Indicator**: A red "N" indicator rotates dynamically with the map, helping players maintain orientation relative to geographic North.
+  - **Flow Arrow**: A central blue arrow visualizes the wind flow direction (e.g., pointing up = downwind/tailwind, pointing down = into the wind).
+
 ## Version: V7.5.0 (Rangefinder Mode)
 **Date:** 2024-05-28
 **Branch:** `main`

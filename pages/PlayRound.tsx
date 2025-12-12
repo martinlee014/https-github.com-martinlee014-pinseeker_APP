@@ -617,6 +617,39 @@ const PlayRound = () => {
       }
   };
 
+  // --- Wind Vane Interaction ---
+  const handleWindCircleInteract = (e: React.MouseEvent | React.TouchEvent) => {
+      const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+      const cx = rect.width / 2;
+      const cy = rect.height / 2;
+      
+      let clientX, clientY;
+      if ('touches' in e) {
+          clientX = e.touches[0].clientX;
+          clientY = e.touches[0].clientY;
+      } else {
+          clientX = (e as React.MouseEvent).clientX;
+          clientY = (e as React.MouseEvent).clientY;
+      }
+
+      const x = clientX - rect.left - cx;
+      const y = clientY - rect.top - cy;
+
+      // Angle calculation relative to circle center
+      // Math.atan2(y, x) -> 0 is 3 o'clock (Right), 90 is 6 o'clock (Down)
+      let angleRad = Math.atan2(y, x);
+      let angleDeg = angleRad * (180 / Math.PI);
+      
+      // Convert to: 0 at Top (Clockwise)
+      angleDeg += 90;
+      if (angleDeg < 0) angleDeg += 360;
+      
+      // angleDeg is now the Relative Angle where 0 is Screen Up
+      // Absolute Wind Dir = BaseBearing + Relative Angle
+      const newDir = (baseBearing + angleDeg) % 360;
+      setWindDir(Math.round(newDir));
+  };
+
   return (
     <div className="h-full relative bg-gray-900 flex flex-col overflow-hidden">
       {/* Map Area */}
@@ -736,11 +769,60 @@ const PlayRound = () => {
       </div>
 
       {showWind && (
-        <div className="absolute top-20 right-14 z-[1000] bg-black/80 backdrop-blur-md p-3 rounded-xl border border-gray-700 w-40 text-xs text-gray-300 shadow-xl">
-            <div className="mb-1 flex justify-between"><span>Speed</span> <span>{windSpeed} m/s</span></div>
-            <input type="range" min="0" max="20" value={windSpeed} onChange={(e) => setWindSpeed(parseInt(e.target.value))} className="w-full accent-blue-500 mb-2 h-1 bg-gray-600 rounded-lg appearance-none" />
-            <div className="mb-1 flex justify-between"><span>Direction</span> <span>{windDir}°</span></div>
-            <input type="range" min="0" max="360" value={windDir} onChange={(e) => setWindDir(parseInt(e.target.value))} className="w-full accent-blue-500 h-1 bg-gray-600 rounded-lg appearance-none" />
+        <div className="absolute top-20 right-14 z-[1000] bg-black/90 backdrop-blur-xl p-4 rounded-2xl border border-gray-700 w-48 text-gray-300 shadow-2xl flex flex-col gap-4">
+            <div className="flex items-center justify-between border-b border-gray-800 pb-2">
+                <span className="font-bold text-white text-sm flex items-center gap-2"><Wind size={16}/> Wind</span>
+                <span className="text-xs bg-blue-900/50 text-blue-300 px-2 py-0.5 rounded border border-blue-500/30">{windSpeed} m/s</span>
+            </div>
+
+            <div>
+                <div className="flex justify-between text-[10px] text-gray-500 mb-1 font-bold uppercase tracking-wider">
+                    <span>Calm</span>
+                    <span>Storm</span>
+                </div>
+                <input type="range" min="0" max="20" value={windSpeed} onChange={(e) => setWindSpeed(parseInt(e.target.value))} className="w-full accent-blue-500 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer" />
+            </div>
+
+            {/* Wind Vane Compass */}
+            <div className="relative w-32 h-32 mx-auto select-none touch-none"
+                 onMouseDown={(e) => { if(e.buttons===1) handleWindCircleInteract(e); }}
+                 onMouseMove={(e) => { if(e.buttons===1) handleWindCircleInteract(e); }}
+                 onClick={handleWindCircleInteract}
+                 onTouchMove={handleWindCircleInteract}
+                 onTouchStart={handleWindCircleInteract}
+            >
+                {/* Compass Ring */}
+                <div className="absolute inset-0 rounded-full border-2 border-gray-700 bg-gray-800/50 shadow-inner">
+                    {[0, 90, 180, 270].map(d => (
+                        <div key={d} className="absolute inset-0 flex justify-center pt-1" style={{ transform: `rotate(${d}deg)` }}>
+                            <div className="w-0.5 h-2 bg-gray-600"></div>
+                        </div>
+                    ))}
+                </div>
+
+                {/* North Indicator (Rotates with Map) */}
+                <div className="absolute inset-0 pointer-events-none transition-transform duration-300" style={{ transform: `rotate(${-baseBearing}deg)` }}>
+                    <div className="absolute top-0 left-1/2 -translate-x-1/2 -mt-1 bg-gray-900 text-[10px] font-bold text-red-500 px-1">N</div>
+                </div>
+
+                {/* Wind Arrow (Flow Direction) */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none transition-transform duration-75" 
+                     style={{ transform: `rotate(${windDir - baseBearing}deg)` }}>
+                    <div className="relative h-full w-full">
+                         <div className="absolute top-2 left-1/2 -translate-x-1/2">
+                            <div className="w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-b-[20px] border-b-blue-500 filter drop-shadow-[0_0_5px_rgba(59,130,246,0.8)]"></div>
+                            <div className="w-1 h-14 bg-blue-500 mx-auto rounded-b-full opacity-80"></div>
+                         </div>
+                    </div>
+                </div>
+
+                {/* Center Hub */}
+                <div className="absolute top-1/2 left-1/2 w-4 h-4 bg-gray-200 rounded-full border-2 border-gray-600 -translate-x-1/2 -translate-y-1/2 shadow-lg z-10"></div>
+            </div>
+            
+            <div className="text-center text-[10px] text-gray-500 mt-[-8px]">
+                Tap or drag to set direction
+            </div>
         </div>
       )}
 
