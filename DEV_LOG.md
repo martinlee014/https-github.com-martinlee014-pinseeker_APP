@@ -1,5 +1,12 @@
 # PinSeeker Web - Development Log
 
+## Version: V7.1.1 (UX Fix)
+**Date:** 2024-05-27
+**Branch:** `main`
+
+### Fixes
+- **Mobile Interaction**: Resolved an issue where long-pressing to drop a ball manually on the map would not trigger on touch devices. Implemented a custom long-press detection logic within `RotatedMapHandler` that works alongside the map panning gestures, while preserving right-click functionality for desktop users.
+
 ## Version: V7.1.0 (Stable Release)
 **Date:** 2024-05-27
 **Branch:** `main`

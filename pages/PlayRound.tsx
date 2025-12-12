@@ -81,10 +81,15 @@ const createReplayLabelIcon = (text: string, rotation: number) => new L.DivIcon(
   iconAnchor: [0, 0] 
 });
 
-const RotatedMapHandler = ({ rotation }: { rotation: number }) => {
+// Refactored to include Long Press detection for touch devices
+const RotatedMapHandler = ({ rotation, onLongPress }: { rotation: number, onLongPress: (latlng: LatLng) => void }) => {
   const map = useMap();
   const isDragging = useRef(false);
   const lastPos = useRef<{x: number, y: number} | null>(null);
+  
+  // Long Press Refs
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const startClientPos = useRef<{x: number, y: number} | null>(null);
 
   useEffect(() => {
     const container = map.getContainer();
@@ -96,18 +101,57 @@ const RotatedMapHandler = ({ rotation }: { rotation: number }) => {
       return { x: (e as MouseEvent).clientX, y: (e as MouseEvent).clientY };
     };
 
+    const handleLongPress = (clientPos: {x: number, y: number}) => {
+        // Calculate LatLng from Container Point
+        const containerRect = container.getBoundingClientRect();
+        // Offset client position by container position to get point relative to map container
+        const layerPoint = L.point(clientPos.x - containerRect.left, clientPos.y - containerRect.top);
+        
+        const latlng = map.containerPointToLatLng(layerPoint);
+        
+        // Haptic Feedback
+        if (navigator.vibrate) navigator.vibrate(50);
+        
+        onLongPress({ lat: latlng.lat, lng: latlng.lng });
+    };
+
     const handleStart = (e: MouseEvent | TouchEvent) => {
+      // Allow Right Click to pass through (handled by contextmenu event in MapEvents)
       if ((e as MouseEvent).button === 2) return; 
+
       isDragging.current = true;
-      lastPos.current = getClientPos(e);
+      const pos = getClientPos(e);
+      lastPos.current = pos;
+      startClientPos.current = pos;
+
+      // Start Long Press Timer (600ms)
+      longPressTimer.current = setTimeout(() => {
+          isDragging.current = false; // Stop dragging if it's a hold
+          handleLongPress(pos);
+      }, 600);
+
+      // Prevent default to stop scrolling/text selection, but we rely on click propagation for simple taps
       if(e.cancelable) e.preventDefault(); 
     };
 
     const handleMove = (e: MouseEvent | TouchEvent) => {
+      const currentPos = getClientPos(e);
+
+      // 1. Check if moved enough to cancel Long Press
+      if (startClientPos.current && longPressTimer.current) {
+          const moveDist = Math.sqrt(
+              Math.pow(currentPos.x - startClientPos.current.x, 2) + 
+              Math.pow(currentPos.y - startClientPos.current.y, 2)
+          );
+          if (moveDist > 10) { // 10px tolerance
+              clearTimeout(longPressTimer.current);
+              longPressTimer.current = null;
+          }
+      }
+
       if (!isDragging.current || !lastPos.current) return;
       if(e.cancelable) e.preventDefault();
 
-      const currentPos = getClientPos(e);
       const deltaX = currentPos.x - lastPos.current.x;
       const deltaY = currentPos.y - lastPos.current.y;
 
@@ -120,8 +164,14 @@ const RotatedMapHandler = ({ rotation }: { rotation: number }) => {
     };
 
     const handleEnd = () => {
+      // Cancel timer on release
+      if (longPressTimer.current) {
+          clearTimeout(longPressTimer.current);
+          longPressTimer.current = null;
+      }
       isDragging.current = false;
       lastPos.current = null;
+      startClientPos.current = null;
     };
 
     container.addEventListener('mousedown', handleStart);
@@ -139,7 +189,7 @@ const RotatedMapHandler = ({ rotation }: { rotation: number }) => {
       window.removeEventListener('mouseup', handleEnd);
       window.removeEventListener('touchend', handleEnd);
     };
-  }, [map, rotation]);
+  }, [map, rotation, onLongPress]);
 
   return null;
 };
@@ -465,7 +515,10 @@ const PlayRound = () => {
             >
               <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" />
               
-              <RotatedMapHandler rotation={mapRotation} />
+              <RotatedMapHandler 
+                  rotation={mapRotation} 
+                  onLongPress={handleManualDrop}
+              />
               
               <MapInitializer 
                 center={currentBallPos} 
