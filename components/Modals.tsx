@@ -110,7 +110,7 @@ export const ShotConfirmModal = ({
            <div className="bg-red-500/10 border border-red-500/20 p-3 rounded-lg flex items-start gap-3">
              <AlertTriangle className="text-red-500 shrink-0" size={20} />
              <div className="text-xs text-red-200">
-               <strong>GPS Warning:</strong> Location is >500m from previous shot. GPS accuracy might be low.
+               <strong>GPS Warning:</strong> Location is &gt;500m from previous shot. GPS accuracy might be low.
              </div>
            </div>
         )}
