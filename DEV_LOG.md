@@ -1,5 +1,21 @@
 # PinSeeker Web - Development Log
 
+## Version: V6.4.2
+**Date:** 2024-05-27
+**Branch:** `V6.4`
+**Summary:** Deployment Repair (Legacy Peer Deps)
+
+### 1. Build & Deployment Repair
+- **NPM EOVERRIDE Fix**: 
+  - **Issue**: The previous `overrides` fix caused a conflict with direct dependencies in Vercel's strict environment (`EOVERRIDE`).
+  - **Fix**: Removed `overrides` from `package.json`.
+  - **Fix**: Created `.npmrc` with `legacy-peer-deps=true`. This instructs the build server to ignore strict peer dependency graph validation, allowing React 18 to be installed alongside libraries that might have loose or conflicting peer requirements, solving the installation error robustly.
+- **Index.html Cleanup**:
+  - **Issue**: `importmap` persisted in the user's file.
+  - **Fix**: Removed `importmap` block again.
+
+---
+
 ## Version: V6.4.1
 **Date:** 2024-05-27
 **Branch:** `V6.4`
