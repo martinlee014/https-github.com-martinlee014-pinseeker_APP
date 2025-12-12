@@ -1,5 +1,18 @@
 # PinSeeker Web - Development Log
 
+## Version: V7.5.0 (Rangefinder Mode)
+**Date:** 2024-05-28
+**Branch:** `main`
+**Status:** ✅ RELEASED
+
+### Features
+- **Measurement Mode (Rangefinder)**: Added a dedicated mode to measure distances on the map.
+  - **New Interface**: A distinct Blue Ruler icon is now available in the top-right control stack (separate from other controls for visibility).
+  - **Interaction**: Tapping the map in this mode sets a measurement target point.
+  - **Visuals**: Displays a solid blue line from the ball to the target, and a white dashed line from the target to the green.
+  - **Data**: The bottom control panel transforms to show large, readable distances ("Distance" and "Remaining") when active.
+  - **GPS Integration**: The measurement starts from the current `ballPos`. Users can use the GPS long-press feature to update their ball position to their physical location before measuring.
+
 ## Version: V7.4.0 (Simplified UI & Smart GPS)
 **Date:** 2024-05-28
 **Branch:** `main`

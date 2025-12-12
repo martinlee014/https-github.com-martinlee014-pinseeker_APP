@@ -9,7 +9,7 @@ import * as MathUtils from '../services/mathUtils';
 import { ClubStats, HoleScore, ShotRecord, RoundHistory, LatLng } from '../types';
 import ClubSelector from '../components/ClubSelector';
 import { ScoreModal, ShotConfirmModal, HoleSelectorModal, FullScorecardModal } from '../components/Modals';
-import { Flag, Wind, ChevronLeft, Grid, ListChecks, ArrowLeft, ArrowRight, ChevronDown, MapPin } from 'lucide-react';
+import { Flag, Wind, ChevronLeft, Grid, ListChecks, ArrowLeft, ArrowRight, ChevronDown, MapPin, Ruler } from 'lucide-react';
 
 // --- Icons Setup ---
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -33,6 +33,14 @@ const targetIcon = new L.DivIcon({
   html: "<div style='background-color:#fbbf24; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 4px black;'></div>",
   iconSize: [12, 12],
   iconAnchor: [6, 6]
+});
+
+// Icon for the intermediate measurement point
+const measureTargetIcon = new L.DivIcon({
+  className: 'custom-measure-icon',
+  html: "<div style='background-color:transparent; width: 20px; height: 20px; border: 3px solid #60a5fa; border-radius: 50%; box-shadow: 0 0 4px black; display:flex; align-items:center; justify-content:center;'><div style='width:6px; height:6px; background-color:#60a5fa; border-radius:50%'></div></div>",
+  iconSize: [20, 20],
+  iconAnchor: [10, 10]
 });
 
 const startMarkerIcon = new L.DivIcon({
@@ -99,26 +107,27 @@ const createReplayLabelIcon = (text: string, rotation: number) => new L.DivIcon(
   iconAnchor: [0, 0] 
 });
 
-const createDistanceLabelIcon = (text: string, rotation: number) => new L.DivIcon({
+const createDistanceLabelIcon = (text: string, rotation: number, color: string = '#ffffff') => new L.DivIcon({
   className: 'custom-label-icon',
   html: `
     <div style='
       transform: rotate(${rotation}deg); 
-      color: #ffffff; 
+      color: ${color}; 
       font-weight: 700;
       font-size: 10px; 
       text-align: center; 
       white-space: nowrap;
-      background-color: rgba(0,0,0,0.7);
-      padding: 2px 6px;
-      border-radius: 4px;
+      background-color: rgba(0,0,0,0.8);
+      padding: 3px 8px;
+      border-radius: 6px;
       display: inline-block;
       border: 1px solid rgba(255,255,255,0.2);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.5);
     '>
       ${text}
     </div>`,
   iconSize: [0, 0], 
-  iconAnchor: [20, 10] 
+  iconAnchor: [20, 15] 
 });
 
 // Refactored to include Long Press detection for touch devices
@@ -321,6 +330,10 @@ const PlayRound = () => {
   const [windSpeed, setWindSpeed] = useState(5);
   const [windDir, setWindDir] = useState(180);
   const [showWind, setShowWind] = useState(false);
+
+  // --- Measurement Mode State ---
+  const [isMeasureMode, setIsMeasureMode] = useState(false);
+  const [measureTarget, setMeasureTarget] = useState<LatLng | null>(null);
   
   // GPS Button Logic Refs
   const gpsPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -405,8 +418,25 @@ const PlayRound = () => {
       lng: predictedLanding.lng + (hole.green.lng - predictedLanding.lng) * 0.33
   }), [predictedLanding, hole]);
 
+  // --- Measurement Calculations ---
+  // If no target selected, default to predicted landing for initial visual
+  const activeMeasureTarget = measureTarget || predictedLanding;
+  
+  const measureDist1 = useMemo(() => MathUtils.calculateDistance(currentBallPos, activeMeasureTarget), [currentBallPos, activeMeasureTarget]);
+  const measureDist2 = useMemo(() => MathUtils.calculateDistance(activeMeasureTarget, hole.green), [activeMeasureTarget, hole]);
+  
+  const labelPos1 = useMemo(() => ({
+      lat: (currentBallPos.lat + activeMeasureTarget.lat) / 2,
+      lng: (currentBallPos.lng + activeMeasureTarget.lng) / 2
+  }), [currentBallPos, activeMeasureTarget]);
+  
+  const labelPos2 = useMemo(() => ({
+      lat: (activeMeasureTarget.lat + hole.green.lat) / 2,
+      lng: (activeMeasureTarget.lng + hole.green.lng) / 2
+  }), [activeMeasureTarget, hole]);
+
   useEffect(() => {
-    if (!isReplay && bag.length > 0) {
+    if (!isReplay && bag.length > 0 && !isMeasureMode) {
       const dist = distToGreen;
       if (dist < 50) {
         setSelectedClub(bag[bag.length - 1]); 
@@ -415,7 +445,7 @@ const PlayRound = () => {
         setSelectedClub(suitable || bag[0]); 
       }
     }
-  }, [currentBallPos, currentHoleIdx, isReplay]);
+  }, [currentBallPos, currentHoleIdx, isReplay, isMeasureMode]);
 
   const nextClubSuggestion = useMemo(() => {
     if (distLandingToGreen < 20) return "Putter";
@@ -427,6 +457,14 @@ const PlayRound = () => {
 
   const handleMapClick = (latlng: any) => {
     if (isReplay) return;
+    
+    // Measurement Mode: Click sets the measurement target
+    if (isMeasureMode) {
+        setMeasureTarget({ lat: latlng.lat, lng: latlng.lng });
+        return;
+    }
+
+    // Normal Mode: Click aims
     const clicked: LatLng = { lat: latlng.lat, lng: latlng.lng };
     const bearingToClick = MathUtils.calculateBearing(currentBallPos, clicked);
     let diff = bearingToClick - baseBearing;
@@ -436,7 +474,7 @@ const PlayRound = () => {
   };
 
   const handleManualDrop = (latlng: any) => {
-    if (isReplay) return;
+    if (isReplay || isMeasureMode) return;
     const pos = { lat: latlng.lat, lng: latlng.lng };
     const dist = MathUtils.calculateDistance(currentBallPos, pos);
     setPendingShot({ pos, isGPS: false, dist });
@@ -465,35 +503,28 @@ const PlayRound = () => {
       const gpsPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
       setCurrentBallPos(gpsPos);
       if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
-      alert("Starting position moved to current GPS location.");
+      alert("Start position updated to current GPS location.");
     }, (err) => alert("GPS Error: " + err.message));
   };
 
   const handleGPSButtonStart = (e: React.MouseEvent | React.TouchEvent) => {
-    // Prevent default to avoid scrolling on mobile or duplicate events
     if(e.cancelable) e.preventDefault();
-    
     isLongPressAction.current = false;
-    
-    // Clear any existing timer
     if (gpsPressTimer.current) clearTimeout(gpsPressTimer.current);
 
     gpsPressTimer.current = setTimeout(() => {
        isLongPressAction.current = true;
        if (navigator.vibrate) navigator.vibrate(100);
-       setTeeToGPS(); // Execute Long Press Action
-    }, 800); // 800ms long press threshold
+       setTeeToGPS(); 
+    }, 800); 
   };
 
   const handleGPSButtonEnd = (e: React.MouseEvent | React.TouchEvent) => {
     if(e.cancelable) e.preventDefault();
-    
     if (gpsPressTimer.current) {
       clearTimeout(gpsPressTimer.current);
       gpsPressTimer.current = null;
     }
-    
-    // If it wasn't a long press (and timer was cleared before firing), it's a click
     if (!isLongPressAction.current) {
         initiateGPSShot();
     }
@@ -556,6 +587,8 @@ const PlayRound = () => {
     setCurrentBallPos(DUVENHOF_HOLES[idx].tee);
     setShotNum(1);
     setAimAngle(0);
+    setMeasureTarget(null);
+    setIsMeasureMode(false);
     setShowHoleSelect(false);
   };
 
@@ -573,6 +606,17 @@ const PlayRound = () => {
     navigate('/summary', { state: { round: history } });
   };
 
+  const toggleMeasureMode = () => {
+      const newState = !isMeasureMode;
+      setIsMeasureMode(newState);
+      if (newState) {
+          // Reset aim to straight when entering measure mode
+          setAimAngle(0);
+          // Set target to predicted so lines appear immediately
+          setMeasureTarget(predictedLanding); 
+      }
+  };
+
   return (
     <div className="h-full relative bg-gray-900 flex flex-col overflow-hidden">
       {/* Map Area */}
@@ -585,7 +629,7 @@ const PlayRound = () => {
               <MapEvents onMapClick={handleMapClick} onMapLongPress={handleManualDrop} />
               <Marker position={[hole.green.lat, hole.green.lng]} icon={flagIcon} />
               
-              {/* Render Shots */}
+              {/* Render Past Shots */}
               {holeShots.map((s, i) => {
                   const curvePoints = MathUtils.getArcPoints(s.from, s.to);
                   const startIcon = s.shotNumber === 1 ? startMarkerIcon : ballIcon;
@@ -620,7 +664,8 @@ const PlayRound = () => {
                   );
               })}
 
-              {!isReplay && (
+              {/* Strategy Mode Visuals */}
+              {!isReplay && !isMeasureMode && (
                   <>
                       <Marker position={[currentBallPos.lat, currentBallPos.lng]} icon={shotNum === 1 ? startMarkerIcon : ballIcon} />
                       <Polyline positions={[[currentBallPos.lat, currentBallPos.lng], [predictedLanding.lat, predictedLanding.lng]]} pathOptions={{ color: "#3b82f6", weight: 3, dashArray: "5, 5" }} />
@@ -628,6 +673,23 @@ const PlayRound = () => {
                       <Marker position={[predictedLanding.lat, predictedLanding.lng]} icon={createArrowIcon(shotBearing)} />
                       <Polyline positions={guideLinePoints as any} pathOptions={{ color: "#fbbf24", weight: 2, dashArray: "4, 6", opacity: 0.8 }} />
                       <Marker position={[guideLabelPos.lat, guideLabelPos.lng]} icon={createDistanceLabelIcon(`Leaves ${MathUtils.formatDistance(distLandingToGreen, useYards)}`, -mapRotation)} />
+                  </>
+              )}
+
+              {/* Measurement Mode Visuals */}
+              {!isReplay && isMeasureMode && activeMeasureTarget && (
+                  <>
+                      <Marker position={[currentBallPos.lat, currentBallPos.lng]} icon={ballIcon} />
+                      <Marker position={[activeMeasureTarget.lat, activeMeasureTarget.lng]} icon={measureTargetIcon} />
+                      
+                      {/* Line 1: Ball -> Target (Blue Solid) */}
+                      <Polyline positions={[[currentBallPos.lat, currentBallPos.lng], [activeMeasureTarget.lat, activeMeasureTarget.lng]]} pathOptions={{ color: "#60a5fa", weight: 4, opacity: 1 }} />
+                      {/* Line 2: Target -> Green (White Dashed) */}
+                      <Polyline positions={[[activeMeasureTarget.lat, activeMeasureTarget.lng], [hole.green.lat, hole.green.lng]]} pathOptions={{ color: "#ffffff", weight: 3, dashArray: "8, 8", opacity: 0.8 }} />
+
+                      {/* Labels */}
+                      <Marker position={[labelPos1.lat, labelPos1.lng]} icon={createDistanceLabelIcon(MathUtils.formatDistance(measureDist1, useYards), -mapRotation, '#60a5fa')} />
+                      <Marker position={[labelPos2.lat, labelPos2.lng]} icon={createDistanceLabelIcon(MathUtils.formatDistance(measureDist2, useYards), -mapRotation, '#ffffff')} />
                   </>
               )}
             </MapContainer>
@@ -645,17 +707,31 @@ const PlayRound = () => {
             </>
            )}
         </div>
+
         <div className="text-center mt-1 drop-shadow-lg pointer-events-none">
           <h2 className="text-2xl font-black text-white drop-shadow-md">HOLE {hole.number}</h2>
           <div className="flex items-center justify-center gap-2 text-xs font-bold bg-black/60 rounded-full px-3 py-1 backdrop-blur-md inline-flex border border-white/10 shadow-lg">
             <span className="text-gray-300">PAR {hole.par}</span><span className="text-gray-500">|</span><span className="text-white">{MathUtils.formatDistance(distToGreen, useYards)}</span>
           </div>
+          {isMeasureMode && <div className="mt-2 text-xs text-blue-300 font-bold bg-blue-900/80 px-4 py-1 rounded-full border border-blue-500/30 inline-block shadow-lg animate-pulse">MEASUREMENT MODE</div>}
         </div>
-        <div className="pointer-events-auto flex flex-col gap-2">
+
+        <div className="pointer-events-auto flex flex-col gap-2 items-end">
+           {/* Primary Controls Stack */}
            {!isReplay && (
-              <button onClick={() => setShowScoreModal(true)} className="bg-green-600/90 p-2 rounded-full text-white shadow-lg shadow-green-900/50 backdrop-blur-md border border-white/10 hover:bg-green-500"><Flag size={20} fill="white"/></button>
+             <>
+               <button onClick={() => setShowScoreModal(true)} className="bg-green-600/90 p-2.5 rounded-full text-white shadow-lg shadow-green-900/50 backdrop-blur-md border border-white/10 hover:bg-green-500 transition-all active:scale-95"><Flag size={20} fill="white"/></button>
+               
+               <button 
+                onClick={toggleMeasureMode} 
+                className={`p-2.5 rounded-full shadow-lg backdrop-blur-md border border-white/10 transition-all active:scale-95 ${isMeasureMode ? 'bg-blue-600 text-white' : 'bg-black/50 text-blue-400 hover:bg-black/70'}`}
+               >
+                  <Ruler size={20} />
+               </button>
+               
+               <button onClick={() => setShowWind(!showWind)} className={`p-2.5 rounded-full shadow-lg backdrop-blur-md border border-white/10 transition-all active:scale-95 ${showWind ? 'bg-black/70 text-blue-400' : 'bg-black/50 text-gray-400 hover:bg-black/70'}`}><Wind size={20} /></button>
+             </>
            )}
-           <button onClick={() => setShowWind(!showWind)} className={`bg-black/50 p-2 rounded-full backdrop-blur-md border border-white/5 hover:bg-black/70 ${showWind ? 'text-blue-400' : 'text-gray-400'}`}><Wind size={20} /></button>
         </div>
       </div>
 
@@ -671,60 +747,70 @@ const PlayRound = () => {
       {/* Bottom Controls */}
       {!isReplay ? (
         <>
-            {/* New Main Controls Container */}
+            {/* Main Controls Container */}
             <div className="absolute bottom-0 w-full z-30 pt-2 px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] bg-gradient-to-t from-black/95 via-black/80 to-transparent">
                 
-                {/* Aim Slider Row */}
-                <div className="flex items-center gap-3 mb-3 bg-gray-900/90 backdrop-blur-md p-2 rounded-xl border border-white/5 shadow-lg">
-                     <div className="text-gray-400 text-[10px] font-bold uppercase tracking-wider pl-1">
-                       Shot {shotNum}
+                {isMeasureMode ? (
+                    /* --- MEASUREMENT MODE PANEL --- */
+                    <div className="bg-gray-900 rounded-2xl border border-blue-500/40 shadow-xl p-6 flex items-center justify-between mb-2">
+                        <div className="flex-1 text-center border-r border-gray-700">
+                            <div className="text-[10px] text-blue-200 uppercase font-bold tracking-widest mb-1 opacity-80">Distance</div>
+                            <div className="text-3xl font-black text-blue-400 leading-none">{MathUtils.formatDistance(measureDist1, useYards)}</div>
+                        </div>
+                         <div className="flex-1 text-center">
+                            <div className="text-[10px] text-gray-400 uppercase font-bold tracking-widest mb-1 opacity-80">Remaining</div>
+                            <div className="text-3xl font-black text-white leading-none">{MathUtils.formatDistance(measureDist2, useYards)}</div>
+                        </div>
                     </div>
-                    <div className="flex items-center gap-2 flex-1">
-                        <span className="text-[10px] font-bold text-gray-500">AIM</span>
-                        <input type="range" min="-45" max="45" value={aimAngle} onChange={(e) => setAimAngle(parseInt(e.target.value))} className="flex-1 accent-white h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer" />
-                        <span className="text-[10px] font-bold text-gray-300 w-6 text-right">{aimAngle}°</span>
-                    </div>
-                </div>
+                ) : (
+                    /* --- STRATEGY PANEL --- */
+                    <>
+                        {/* Aim Slider Row */}
+                        <div className="flex items-center gap-3 mb-3 bg-gray-900/90 backdrop-blur-md p-2 rounded-xl border border-white/5 shadow-lg">
+                            <div className="text-gray-400 text-[10px] font-bold uppercase tracking-wider pl-1">
+                            Shot {shotNum}
+                            </div>
+                            <div className="flex items-center gap-2 flex-1">
+                                <span className="text-[10px] font-bold text-gray-500">AIM</span>
+                                <input type="range" min="-45" max="45" value={aimAngle} onChange={(e) => setAimAngle(parseInt(e.target.value))} className="flex-1 accent-white h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer" />
+                                <span className="text-[10px] font-bold text-gray-300 w-6 text-right">{aimAngle}°</span>
+                            </div>
+                        </div>
 
-                {/* Main Action Row: Simplified UI 1:1 Split */}
-                <div className="flex gap-3 h-16 items-stretch">
-                    {/* 1. Combined Info Panel (Club + Stats) */}
-                    <div className="flex-1 relative bg-gray-900 rounded-2xl border border-white/5 shadow-xl overflow-hidden flex">
-                         {/* Invisible Select overlay */}
-                         <div className="absolute inset-0 z-10 opacity-0"><ClubSelector clubs={bag} selectedClub={selectedClub} onSelect={setSelectedClub} useYards={useYards} /></div>
+                        {/* Club & GPS Controls */}
+                        <div className="flex gap-3 h-16 items-stretch">
+                            <div className="flex-1 relative bg-gray-900 rounded-2xl border border-white/5 shadow-xl overflow-hidden flex">
+                                <div className="absolute inset-0 z-10 opacity-0"><ClubSelector clubs={bag} selectedClub={selectedClub} onSelect={setSelectedClub} useYards={useYards} /></div>
+                                <div className="flex-1 flex flex-col justify-center pl-4 pr-1 border-r border-white/5 pointer-events-none">
+                                    <span className="text-[9px] text-gray-500 uppercase font-bold tracking-widest mb-0.5 flex items-center gap-1">Club <ChevronDown size={8}/></span>
+                                    <div className="text-xl font-bold text-white truncate leading-none">{selectedClub.name}</div>
+                                    <div className="text-[10px] text-gray-500 mt-1">
+                                        {MathUtils.formatDistance(useYards ? selectedClub.carry * 1.09361 : selectedClub.carry, useYards)}
+                                    </div>
+                                </div>
+                                <div className="flex-1 flex flex-col justify-center items-end pr-4 pl-1 pointer-events-none bg-gray-800/30">
+                                    <span className="text-[9px] text-gray-500 uppercase font-bold tracking-widest mb-0.5">Leaves</span>
+                                    <div className="text-xl font-bold text-white leading-none">{MathUtils.formatDistance(distLandingToGreen, useYards)}</div>
+                                    <div className="text-[10px] text-gray-500 mt-1 text-right truncate w-full">
+                                        Rec: <span className="text-white font-medium">{nextClubSuggestion}</span>
+                                    </div>
+                                </div>
+                            </div>
 
-                         {/* Left Side: Club Selection */}
-                         <div className="flex-1 flex flex-col justify-center pl-4 pr-1 border-r border-white/5 pointer-events-none">
-                             <span className="text-[9px] text-gray-500 uppercase font-bold tracking-widest mb-0.5 flex items-center gap-1">Club <ChevronDown size={8}/></span>
-                             <div className="text-xl font-bold text-white truncate leading-none">{selectedClub.name}</div>
-                             <div className="text-[10px] text-gray-500 mt-1">
-                                {MathUtils.formatDistance(useYards ? selectedClub.carry * 1.09361 : selectedClub.carry, useYards)}
-                             </div>
-                         </div>
-
-                         {/* Right Side: Leaves / Rec */}
-                         <div className="flex-1 flex flex-col justify-center items-end pr-4 pl-1 pointer-events-none bg-gray-800/30">
-                             <span className="text-[9px] text-gray-500 uppercase font-bold tracking-widest mb-0.5">Leaves</span>
-                             <div className="text-xl font-bold text-white leading-none">{MathUtils.formatDistance(distLandingToGreen, useYards)}</div>
-                             <div className="text-[10px] text-gray-500 mt-1 text-right truncate w-full">
-                                Rec: <span className="text-white font-medium">{nextClubSuggestion}</span>
-                             </div>
-                         </div>
-                    </div>
-
-                    {/* 2. GPS Record Button - Dual Function */}
-                    <button 
-                       onMouseDown={handleGPSButtonStart}
-                       onMouseUp={handleGPSButtonEnd}
-                       onMouseLeave={handleGPSButtonEnd}
-                       onTouchStart={handleGPSButtonStart}
-                       onTouchEnd={handleGPSButtonEnd}
-                       className="w-16 flex-none bg-emerald-600 active:bg-emerald-500 text-white rounded-2xl flex flex-col items-center justify-center shadow-lg shadow-emerald-900/20 border border-white/5 transition-all select-none"
-                    >
-                        <MapPin size={24} fill="currentColor" className="text-white/90 mb-0.5" />
-                        <span className="text-[8px] font-bold opacity-70">GPS</span>
-                    </button>
-                </div>
+                            <button 
+                            onMouseDown={handleGPSButtonStart}
+                            onMouseUp={handleGPSButtonEnd}
+                            onMouseLeave={handleGPSButtonEnd}
+                            onTouchStart={handleGPSButtonStart}
+                            onTouchEnd={handleGPSButtonEnd}
+                            className="w-16 flex-none bg-emerald-600 active:bg-emerald-500 text-white rounded-2xl flex flex-col items-center justify-center shadow-lg shadow-emerald-900/20 border border-white/5 transition-all select-none"
+                            >
+                                <MapPin size={24} fill="currentColor" className="text-white/90 mb-0.5" />
+                                <span className="text-[8px] font-bold opacity-70">GPS</span>
+                            </button>
+                        </div>
+                    </>
+                )}
             </div>
         </>
       ) : (
