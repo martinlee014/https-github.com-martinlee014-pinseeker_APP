@@ -1,5 +1,19 @@
 # PinSeeker Web - Development Log
 
+## Version: V6.4.3
+**Date:** 2024-05-27
+**Branch:** `V6.4`
+**Summary:** Critical Deployment Fix (.npmrc)
+
+### 1. Build & Deployment Repair
+- **Force Legacy Peer Deps**: 
+  - **Issue**: Deployment fails with `npm error peer react...`.
+  - **Fix**: Added `.npmrc` file with `legacy-peer-deps=true`. This ensures Vercel ignores strict peer dependency conflicts and installs React 18 successfully.
+- **Index.html Cleanup**:
+  - **Fix**: Removed `importmap` again to prevent React 19 CDN loading.
+
+---
+
 ## Version: V6.4.2
 **Date:** 2024-05-27
 **Branch:** `V6.4`
