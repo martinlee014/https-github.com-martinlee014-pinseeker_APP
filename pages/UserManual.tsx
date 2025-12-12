@@ -1,3 +1,4 @@
+
 import { ChevronLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -33,7 +34,18 @@ const UserManual = () => {
         </p>
 
         <Section 
-          title="Club Management (New!)"
+          title="Managing Courses (New!)"
+          items={[
+            'Navigate to Settings > Course Database to view or add new courses.',
+            'Tap the "+" button to enter the Course Editor.',
+            'Type a location (e.g., "Pebble Beach") to find the course on the map.',
+            'Select a hole, then tap "Map" or "GPS" to set the Tee Box and Green locations.',
+            'Verify distances and Par in the summary screen before saving.'
+          ]}
+        />
+
+        <Section 
+          title="Club Management"
           items={[
             'Go to Settings > Club Management to customize your golf bag.',
             'Tap the "+" button to add a new club, or the Edit icon to modify an existing one.',
@@ -44,11 +56,10 @@ const UserManual = () => {
         />
 
         <Section 
-          title="Starting a Round"
+          title="Advanced Tools (New!)"
           items={[
-            'Tap the "START NEW ROUND" button on the main dashboard.',
-            'The app will automatically load the first hole of Duvenhof Golf Club.',
-            'If you have an unfinished round, you will be prompted to restore it.'
+            'Measurement Mode: Tap the Ruler icon (top right) to enter measurement mode. Tap anywhere on the map to measure the distance from your ball to that point, and from that point to the green.',
+            'Wind Vane: Tap the Wind icon to open the compass. Drag the ring to set the wind direction relative to North. The blue arrow indicates the wind flow.'
           ]}
         />
 
@@ -63,11 +74,11 @@ const UserManual = () => {
         />
 
         <Section 
-          title="Recording Shots"
+          title="Recording Shots & Undo"
           items={[
-            'Walk to your ball and tap "Record Shot (GPS)" to save your actual location.',
+            'Walk to your ball and tap the GPS button to save your actual location.',
             'If GPS is unavailable or inaccurate, long-press anywhere on the map to manually drop your ball location.',
-            'A dotted white line will track your shot history for the current hole.'
+            'Undo: If you record a shot incorrectly, long-press the yellow shot marker on the map. A dialog will appear allowing you to delete it. Deleting the most recent shot will reset your position to the previous spot.'
           ]}
         />
 

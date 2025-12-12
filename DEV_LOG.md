@@ -1,6 +1,17 @@
 
 # PinSeeker Web - Development Log
 
+## Version: V7.8.0 (Shot Undo & Refinement)
+**Date:** 2024-05-28
+**Branch:** `main`
+**Status:** ✅ RELEASED
+
+### Features
+- **Shot Deletion / Undo**: Added the ability to correct mistakes during a round.
+  - **Interaction**: Long-press (mobile) or Right-click (desktop) on any past shot marker (yellow dots) to bring up the delete dialog.
+  - **Logic**: Deleting the most recent shot acts as an "Undo" function, resetting the player's current ball position and shot count to the state before that shot was taken. Deleting older shots removes them from the scorecard history.
+- **User Manual Update**: comprehensively updated the manual to include instructions for the new Course Editor, Measurement Mode, Wind Compass, and Shot Undo features.
+
 ## Version: V7.7.2 (Course Editor Overhaul)
 **Date:** 2024-05-28
 **Branch:** `main`

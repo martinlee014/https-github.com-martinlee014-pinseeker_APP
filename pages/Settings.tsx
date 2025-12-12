@@ -127,12 +127,11 @@ const Settings = () => {
       </div>
       
       <div className="text-center text-xs text-gray-600 mt-10">
-          PinSeeker Web v7.7.2
+          PinSeeker Web v7.8.0
       </div>
 
       {showInstallHelp && (
         <ModalOverlay onClose={() => setShowInstallHelp(false)}>
-           {/* Modal content same as before */}
            <div className="p-6 text-center">
              {isIOS ? (
                  <>

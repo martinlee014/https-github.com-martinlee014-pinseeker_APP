@@ -9,8 +9,8 @@ import { StorageService } from '../services/storage';
 import * as MathUtils from '../services/mathUtils';
 import { ClubStats, HoleScore, ShotRecord, RoundHistory, LatLng, GolfCourse } from '../types';
 import ClubSelector from '../components/ClubSelector';
-import { ScoreModal, ShotConfirmModal, HoleSelectorModal, FullScorecardModal } from '../components/Modals';
-import { Flag, Wind, ChevronLeft, Grid, ListChecks, ArrowLeft, ArrowRight, ChevronDown, MapPin, Ruler } from 'lucide-react';
+import { ScoreModal, ShotConfirmModal, HoleSelectorModal, FullScorecardModal, ModalOverlay } from '../components/Modals';
+import { Flag, Wind, ChevronLeft, Grid, ListChecks, ArrowLeft, ArrowRight, ChevronDown, MapPin, Ruler, Trash2, AlertTriangle } from 'lucide-react';
 
 // --- Icons Setup ---
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -341,6 +341,9 @@ const PlayRound = () => {
   const [isMeasureMode, setIsMeasureMode] = useState(false);
   const [measureTarget, setMeasureTarget] = useState<LatLng | null>(null);
   
+  // --- Deletion State ---
+  const [shotToDelete, setShotToDelete] = useState<ShotRecord | null>(null);
+
   // GPS Button Logic Refs
   const gpsPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isLongPressAction = useRef(false);
@@ -603,6 +606,26 @@ const PlayRound = () => {
     }
   };
 
+  const handleDeleteShot = () => {
+    if (!shotToDelete) return;
+    
+    // Check if we are deleting the most recent shot of the current hole
+    const holeShotsList = shots.filter(s => s.holeNumber === hole.number);
+    const isMostRecent = holeShotsList.length > 0 && holeShotsList[holeShotsList.length - 1] === shotToDelete;
+
+    // Filter out the shot
+    const newShots = shots.filter(s => s !== shotToDelete);
+    setShots(newShots);
+
+    // If it was the latest shot, revert game state (Undo)
+    if (isMostRecent) {
+        setCurrentBallPos(shotToDelete.from);
+        setShotNum(Math.max(1, shotToDelete.shotNumber));
+    }
+
+    setShotToDelete(null);
+  };
+
   const saveHoleScore = (putts: number, pens: number) => {
     const shotsTaken = shotNum - 1; 
     const newScore: HoleScore = {
@@ -728,7 +751,16 @@ const PlayRound = () => {
                               )}
                             </>
                         ) : (
-                            <Marker position={[s.to.lat, s.to.lng]} icon={targetIcon} />
+                            <Marker 
+                                position={[s.to.lat, s.to.lng]} 
+                                icon={targetIcon} 
+                                eventHandlers={{
+                                    contextmenu: (e) => {
+                                        L.DomEvent.stopPropagation(e.originalEvent);
+                                        setShotToDelete(s);
+                                    }
+                                }}
+                            />
                         )}
                     </Fragment>
                   );
@@ -918,6 +950,36 @@ const PlayRound = () => {
       {showScoreModal && <ScoreModal par={hole.par} holeNum={hole.number} onSave={saveHoleScore} onClose={() => setShowScoreModal(false)} />}
       {showFullCard && <FullScorecardModal holes={activeCourse.holes} scorecard={scorecard} onFinishRound={finishRound} onClose={() => setShowFullCard(false)} />}
       {pendingShot && <ShotConfirmModal dist={MathUtils.formatDistance(pendingShot.dist, useYards)} club={selectedClub} clubs={bag} isGPS={pendingShot.isGPS} isLongDistWarning={pendingShot.dist > 500} onChangeClub={setSelectedClub} onConfirm={confirmShot} onCancel={() => setPendingShot(null)} />}
+      
+      {/* Delete Shot Confirmation Modal */}
+      {shotToDelete && (
+        <ModalOverlay onClose={() => setShotToDelete(null)}>
+            <div className="p-6 bg-gray-900 text-center rounded-2xl">
+                <div className="bg-red-500/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-500/20">
+                    <Trash2 className="text-red-500" size={32} />
+                </div>
+                <h3 className="text-xl font-bold text-white mb-2">Delete Shot?</h3>
+                <p className="text-gray-400 text-sm mb-6">
+                    Are you sure you want to remove this shot record? 
+                    {shots.indexOf(shotToDelete) === shots.length - 1 && " This will reset your position to the previous shot."}
+                </p>
+                <div className="flex gap-3">
+                    <button 
+                        onClick={() => setShotToDelete(null)}
+                        className="flex-1 bg-gray-800 hover:bg-gray-700 text-white font-bold py-3 rounded-xl border border-gray-700"
+                    >
+                        Cancel
+                    </button>
+                    <button 
+                        onClick={handleDeleteShot}
+                        className="flex-1 bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-xl shadow-lg"
+                    >
+                        Delete
+                    </button>
+                </div>
+            </div>
+        </ModalOverlay>
+      )}
     </div>
   );
 };
