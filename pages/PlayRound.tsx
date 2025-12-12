@@ -60,6 +60,24 @@ const ballIcon = new L.DivIcon({
   iconAnchor: [7, 7]
 });
 
+// Arrow Icon for Planning Mode
+const createArrowIcon = (rotation: number) => new L.DivIcon({
+  className: 'bg-transparent',
+  html: `
+    <div style="
+      transform: rotate(${rotation}deg); 
+      width: 0; 
+      height: 0; 
+      border-left: 8px solid transparent;
+      border-right: 8px solid transparent;
+      border-bottom: 20px solid #3b82f6;
+      filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.5));
+    "></div>
+  `,
+  iconSize: [20, 20],
+  iconAnchor: [10, 10] // Center the pivot
+});
+
 const createReplayLabelIcon = (text: string, rotation: number) => new L.DivIcon({
   className: 'custom-label-icon',
   html: `
@@ -135,6 +153,18 @@ const RotatedMapHandler = ({ rotation, onLongPress }: { rotation: number, onLong
     const handleStart = (e: MouseEvent | TouchEvent) => {
       if ((e as MouseEvent).button === 2) return; 
 
+      // --- Multi-touch Detection (Pinch Zoom Fix) ---
+      if (window.TouchEvent && e instanceof TouchEvent && e.touches.length > 1) {
+          // If a second finger touches, CANCEL any pending long press
+          if (longPressTimer.current) {
+              clearTimeout(longPressTimer.current);
+              longPressTimer.current = null;
+          }
+          isDragging.current = false;
+          // Do not proceed with custom drag logic for multi-touch
+          return;
+      }
+
       isDragging.current = true;
       const pos = getClientPos(e);
       lastPos.current = pos;
@@ -145,10 +175,24 @@ const RotatedMapHandler = ({ rotation, onLongPress }: { rotation: number, onLong
           handleLongPress(pos);
       }, 600);
 
-      if(e.cancelable) e.preventDefault(); 
+      // Only prevent default if it's a single touch to allow scrolling/panning 
+      // but in rotated map we handle pan manually, so strictly speaking:
+      if(e.cancelable && (!window.TouchEvent || !(e instanceof TouchEvent))) {
+         e.preventDefault(); 
+      }
     };
 
     const handleMove = (e: MouseEvent | TouchEvent) => {
+      // --- Multi-touch Detection Check ---
+      if (window.TouchEvent && e instanceof TouchEvent && e.touches.length > 1) {
+          if (longPressTimer.current) {
+              clearTimeout(longPressTimer.current);
+              longPressTimer.current = null;
+          }
+          isDragging.current = false;
+          return;
+      }
+
       const currentPos = getClientPos(e);
 
       if (startClientPos.current && longPressTimer.current) {
@@ -399,7 +443,16 @@ const PlayRound = () => {
           from: currentBallPos || targetHole.tee,
           to: pendingShot.pos,
           clubUsed: selectedClub.name,
-          distance: pendingShot.dist
+          distance: pendingShot.dist,
+          // Save the current plan data for later analysis (Did I hit the circle?)
+          plannedInfo: {
+            target: predictedLanding,
+            dispersion: {
+              width: selectedClub.sideError,
+              depth: selectedClub.depthError,
+              rotation: 90 - shotBearing
+            }
+          }
         };
         setShots(prev => [...prev, newShot]);
         setCurrentBallPos(pendingShot.pos);
@@ -475,16 +528,37 @@ const PlayRound = () => {
               <MapEvents onMapClick={handleMapClick} onMapLongPress={handleManualDrop} />
               <Marker position={[hole.green.lat, hole.green.lng]} icon={flagIcon} />
               
+              {/* Render Shots */}
               {holeShots.map((s, i) => {
                   const curvePoints = MathUtils.getArcPoints(s.from, s.to);
                   const startIcon = s.shotNumber === 1 ? startMarkerIcon : ballIcon;
+                  
+                  // Calculate planned dispersion ellipse for replay if available
+                  let plannedEllipse = [];
+                  if (s.plannedInfo) {
+                    plannedEllipse = MathUtils.getEllipsePoints(
+                      s.plannedInfo.target, 
+                      s.plannedInfo.dispersion.width, 
+                      s.plannedInfo.dispersion.depth, 
+                      s.plannedInfo.dispersion.rotation
+                    ).map(p => [p.lat, p.lng] as [number, number]);
+                  }
+
                   return (
                     <Fragment key={i}>
                         <Marker position={[s.from.lat, s.from.lng]} icon={startIcon} />
+                        {/* Actual Shot Path */}
                         <Polyline positions={[[s.from.lat, s.from.lng], [s.to.lat, s.to.lng]]} pathOptions={{ color: "black", weight: 4, opacity: 0.3 }} />
                         <Polyline positions={curvePoints.map(p => [p.lat, p.lng])} pathOptions={{ color: "white", weight: 2, opacity: 0.8 }} />
+                        
                         {isReplay ? (
-                            <Marker position={[s.to.lat, s.to.lng]} icon={createReplayLabelIcon(`${s.clubUsed} - ${MathUtils.formatDistance(s.distance, useYards)}`, -mapRotation)} />
+                            <>
+                              <Marker position={[s.to.lat, s.to.lng]} icon={createReplayLabelIcon(`${s.clubUsed} - ${MathUtils.formatDistance(s.distance, useYards)}`, -mapRotation)} />
+                              {/* Show where the player AIMED vs where it LANDED */}
+                              {plannedEllipse.length > 0 && (
+                                <Polygon positions={plannedEllipse} pathOptions={{ color: '#fbbf24', fillColor: '#fbbf24', fillOpacity: 0.1, weight: 1, dashArray: '4,4' }} />
+                              )}
+                            </>
                         ) : (
                             <Marker position={[s.to.lat, s.to.lng]} icon={targetIcon} />
                         )}
@@ -492,14 +566,18 @@ const PlayRound = () => {
                   );
               })}
 
+              {/* Planning / Strategy Visualization (Active Round Only) */}
               {!isReplay && (
                   <>
                       <Marker position={[currentBallPos.lat, currentBallPos.lng]} icon={shotNum === 1 ? startMarkerIcon : ballIcon} />
-                      <Polyline positions={[[currentBallPos.lat, currentBallPos.lng], [predictedLanding.lat, predictedLanding.lng]]} pathOptions={{ color: "black", weight: 4, opacity: 0.2 }} />
-                      <Polyline positions={MathUtils.getArcPoints(currentBallPos, predictedLanding).map(p => [p.lat, p.lng])} pathOptions={{ color: "#3b82f6", weight: 3 }} />
-                      <Polyline positions={[[predictedLanding.lat, predictedLanding.lng], [hole.green.lat, hole.green.lng]]} pathOptions={{ color: "#fbbf24", weight: 2, dashArray: "4,4" }} />
+                      {/* Straight Line for Planning */}
+                      <Polyline positions={[[currentBallPos.lat, currentBallPos.lng], [predictedLanding.lat, predictedLanding.lng]]} pathOptions={{ color: "#3b82f6", weight: 3, dashArray: "5, 5" }} />
+                      
+                      {/* Predicted Dispersion Circle */}
                       <Polygon positions={ellipsePoints} pathOptions={{ color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.2, weight: 1 }} />
-                      <Marker position={[predictedLanding.lat, predictedLanding.lng]} icon={targetIcon} />
+                      
+                      {/* Arrow at the Tip (Target) */}
+                      <Marker position={[predictedLanding.lat, predictedLanding.lng]} icon={createArrowIcon(shotBearing)} />
                   </>
               )}
             </MapContainer>

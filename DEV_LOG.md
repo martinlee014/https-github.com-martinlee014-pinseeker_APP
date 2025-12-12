@@ -1,5 +1,19 @@
 # PinSeeker Web - Development Log
 
+## Version: V7.2.0 (Strategy & Visual Overhaul)
+**Date:** 2024-05-28
+**Branch:** `main`
+
+### Features
+- **Strategy Visualization**: Replaced curved lines in the active round view with a cleaner **Straight Line + Directional Arrow** design. This simplifies the view when planning shots.
+- **Dispersion Analysis (Plan vs. Actual)**: 
+  - The app now records the *planned* dispersion ellipse at the moment a shot is confirmed.
+  - **Replay Mode** now renders this "Planned Dispersion" (as a dashed yellow circle) alongside the actual shot result. This allows players to visually verify if their shot landed within their expected margin of error.
+
+### Fixes
+- **Map Interaction**: Fixed a frustration where pinch-to-zoom gestures on touch devices would accidentally trigger the "Long Press" manual drop logic. Added multi-touch detection to cancel the drop timer.
+- **Club Editor UI**: Resized the Dispersion Visualizer and made it sticky at the top of the screen. This fixes an issue where the bottom save/setting controls would obscure the graph while adjusting sliders on mobile devices.
+
 ## Version: V7.1.2 (Touch Input Calibration)
 **Date:** 2024-05-27
 **Branch:** `main`

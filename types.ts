@@ -24,6 +24,15 @@ export interface ShotRecord {
   to: LatLng;
   clubUsed: string;
   distance: number;
+  // New fields for replay analysis
+  plannedInfo?: {
+    target: LatLng; // The center of the ellipse aimed at
+    dispersion: {
+      width: number; // sideError
+      depth: number; // depthError
+      rotation: number; // 90 - shotBearing
+    };
+  };
 }
 
 export interface HoleScore {
