@@ -486,15 +486,11 @@ const PlayRound = () => {
                         <Marker position={[s.from.lat, s.from.lng]} icon={startIcon} />
                         <Polyline 
                           positions={[[s.from.lat, s.from.lng], [s.to.lat, s.to.lng]]} 
-                          color="black" 
-                          weight={4} 
-                          opacity={0.3} 
+                          pathOptions={{ color: "black", weight: 4, opacity: 0.3 }}
                         />
                         <Polyline 
                           positions={curvePoints.map(p => [p.lat, p.lng])} 
-                          color="white" 
-                          weight={2} 
-                          opacity={0.8} 
+                          pathOptions={{ color: "white", weight: 2, opacity: 0.8 }}
                         />
                         {isReplay ? (
                             <Marker 
@@ -513,15 +509,15 @@ const PlayRound = () => {
                       <Marker position={[currentBallPos.lat, currentBallPos.lng]} icon={shotNum === 1 ? startMarkerIcon : ballIcon} />
                       <Polyline 
                           positions={[[currentBallPos.lat, currentBallPos.lng], [predictedLanding.lat, predictedLanding.lng]]} 
-                          color="black" weight={4} opacity={0.2} 
+                          pathOptions={{ color: "black", weight: 4, opacity: 0.2 }}
                       />
                       <Polyline 
                           positions={MathUtils.getArcPoints(currentBallPos, predictedLanding).map(p => [p.lat, p.lng])} 
-                          color="#3b82f6" weight={3} 
+                          pathOptions={{ color: "#3b82f6", weight: 3 }}
                       />
                       <Polyline 
                           positions={[[predictedLanding.lat, predictedLanding.lng], [hole.green.lat, hole.green.lng]]} 
-                          color="#fbbf24" weight={2} dashArray="4,4"
+                          pathOptions={{ color: "#fbbf24", weight: 2, dashArray: "4,4" }}
                       />
                       <Polygon positions={ellipsePoints} pathOptions={{ color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.2, weight: 1 }} />
                       <Marker position={[predictedLanding.lat, predictedLanding.lng]} icon={targetIcon} />
