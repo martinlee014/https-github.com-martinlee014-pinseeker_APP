@@ -1,5 +1,20 @@
 # PinSeeker Web - Development Log
 
+## Version: V6.4.1
+**Date:** 2024-05-27
+**Branch:** `V6.4`
+**Summary:** Critical Deployment Fix (NPM Peer Deps)
+
+### 1. Build & Deployment Repair
+- **NPM Install Error**: 
+  - **Issue**: Deployment was failing with `npm error peer react@"^16.5.1 || ^17.0.0 || ^18.0.0" from lucide-react`. This happens when the build environment mistakenly attempts to install React 19.
+  - **Fix**: Added `"overrides": { "react": "18.2.0", "react-dom": "18.2.0" }` to `package.json`. This forces npm to use React 18, satisfying all peer dependencies.
+- **Index.html Cleanup**:
+  - **Issue**: The `importmap` pointing to React 19 was still present, potentially causing runtime "Multiple React Instances" errors.
+  - **Fix**: Removed `importmap` block completely.
+
+---
+
 ## Version: V6.4
 **Date:** 2024-05-27
 **Branch:** `V6.4`
@@ -38,53 +53,3 @@
   - **新行为**: 按钮**永远显示**。
     - **Android/Desktop**: 点击触发原生安装弹窗。
     - **iOS/其他**: 点击弹出模态框，图文指导用户手动 "添加到主屏幕"。
-
----
-
-## Version: V6.2
-**Date:** 2024-05-25
-**Branch:** `V6.2`
-**Summary:** PWA 支持与安装功能 (PWA Support & App Installation)
-
-### 1. 核心特性 (Key Features)
-- **PWA (Progressive Web App)**:
-  - 添加了 `manifest.json` 和 `sw.js` (Service Worker)。
-  - 支持全屏显示 (`display: standalone`)。
-- **安装引导 (Install Flow)**:
-  - **Settings 页面**: 新增 "Install App" 按钮。
-
-### 2. 关键修复 (Critical Fixes)
-- **依赖冲突清理**: 尝试移除 `index.html` 中的 `importmap` (在 V6.3 中彻底完成)。
-
----
-
-## Version: V6.1
-**Date:** 2024-05-24
-**Branch:** `V6.1`
-**Summary:** UI 玻璃拟态重构与下一杆策略预测 (Glassmorphism UI Redesign & Next Shot Prediction Engine)
-
-### 1. 核心特性 (Key Features)
-- **下一杆预测引擎 (Next Shot Prediction)**: 自动推荐下一杆球杆。
-- **沉浸式地图体验 (Immersive Map UI)**: 地图全屏化，UI 改为悬浮玻璃拟态。
-
----
-
-## Version: V6.0
-**Date:** 2024-05-23
-**Branch:** `V6.0`
-**Summary:** 新增球杆管理系统与落点可视化 (Club Management & Dispersion Visualization)
-
-### 1. 新特性 (New Features)
-- **球杆管理**: 支持添加/编辑球杆，新增落点散布可视化编辑器。
-- **Global Context**: 球杆数据全局化。
-
----
-
-## Version: V5.0
-**Date:** 2024-05-22
-**Branch:** `V5.0`
-**Summary:** 修复复盘问题，重构代码 (Fix replay issues, refactor code)
-
-- 修复屏幕抖动 (Map Shake)。
-- 优化发球台标记图标。
-- 智能视野缩放 (Auto-fit Bounds)。
