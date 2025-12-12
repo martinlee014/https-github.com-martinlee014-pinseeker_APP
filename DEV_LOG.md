@@ -1,5 +1,13 @@
 # PinSeeker Web - Development Log
 
+## Version: V7.1.2 (Touch Input Calibration)
+**Date:** 2024-05-27
+**Branch:** `main`
+
+### Fixes
+- **Long Press Sensitivity**: Reduced the movement tolerance from 10px to **5px** for touch gestures. This ensures that intentional dragging does not accidentally trigger a "long press" drop, making the interaction much more stable.
+- **Coordinate Calculation**: Fixed a critical bug where the "Manual Drop" location was offset significantly from the finger position. This was caused by the CSS `transform: rotate() scale(1.4)` on the map container. Implemented an inverse transformation algorithm in `RotatedMapHandler` to correctly map screen pixels back to the map's internal coordinate system.
+
 ## Version: V7.1.1 (UX Fix)
 **Date:** 2024-05-27
 **Branch:** `main`

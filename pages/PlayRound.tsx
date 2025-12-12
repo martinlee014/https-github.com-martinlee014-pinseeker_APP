@@ -102,12 +102,45 @@ const RotatedMapHandler = ({ rotation, onLongPress }: { rotation: number, onLong
     };
 
     const handleLongPress = (clientPos: {x: number, y: number}) => {
-        // Calculate LatLng from Container Point
-        const containerRect = container.getBoundingClientRect();
-        // Offset client position by container position to get point relative to map container
-        const layerPoint = L.point(clientPos.x - containerRect.left, clientPos.y - containerRect.top);
+        // --- Fix for Coordinate Mismatch on Rotated/Scaled Map ---
+        // The container is transformed via CSS: rotate(${rotation}deg) scale(1.4)
+        // We need to reverse this math to get the internal Leaflet container point.
         
-        const latlng = map.containerPointToLatLng(layerPoint);
+        // 1. Get Visual Center of the viewport (which is the center of rotation/scale)
+        const viewportW = window.innerWidth;
+        const viewportH = window.innerHeight;
+        const cx = viewportW / 2;
+        const cy = viewportH / 2;
+
+        // 2. Calculate vector from center to click position (Visual Offset)
+        const dx = clientPos.x - cx;
+        const dy = clientPos.y - cy;
+
+        // 3. Inverse Scale (1.4 is hardcoded in the render method below)
+        const scale = 1.4;
+        const unscaledDx = dx / scale;
+        const unscaledDy = dy / scale;
+
+        // 4. Inverse Rotation
+        // CSS rotates clockwise. To undo, we rotate counter-clockwise by same amount.
+        // Or essentially: rotate by -rotation.
+        const angleRad = (-rotation * Math.PI) / 180;
+        
+        // Standard 2D Rotation Matrix:
+        // x' = x cos θ - y sin θ
+        // y' = x sin θ + y cos θ
+        const rotatedX = unscaledDx * Math.cos(angleRad) - unscaledDy * Math.sin(angleRad);
+        const rotatedY = unscaledDx * Math.sin(angleRad) + unscaledDy * Math.cos(angleRad);
+
+        // 5. Add back to Leaflet's internal center
+        const mapSize = map.getSize();
+        const mapCx = mapSize.x / 2;
+        const mapCy = mapSize.y / 2;
+        
+        const leafPoint = L.point(mapCx + rotatedX, mapCy + rotatedY);
+
+        // 6. Convert to LatLng
+        const latlng = map.containerPointToLatLng(leafPoint);
         
         // Haptic Feedback
         if (navigator.vibrate) navigator.vibrate(50);
@@ -130,7 +163,7 @@ const RotatedMapHandler = ({ rotation, onLongPress }: { rotation: number, onLong
           handleLongPress(pos);
       }, 600);
 
-      // Prevent default to stop scrolling/text selection, but we rely on click propagation for simple taps
+      // Prevent default to stop scrolling/text selection
       if(e.cancelable) e.preventDefault(); 
     };
 
@@ -138,12 +171,13 @@ const RotatedMapHandler = ({ rotation, onLongPress }: { rotation: number, onLong
       const currentPos = getClientPos(e);
 
       // 1. Check if moved enough to cancel Long Press
+      // Fix: Reduced tolerance from 10px to 5px to prevent accidental drops while dragging
       if (startClientPos.current && longPressTimer.current) {
           const moveDist = Math.sqrt(
               Math.pow(currentPos.x - startClientPos.current.x, 2) + 
               Math.pow(currentPos.y - startClientPos.current.y, 2)
           );
-          if (moveDist > 10) { // 10px tolerance
+          if (moveDist > 5) { // Stricter tolerance
               clearTimeout(longPressTimer.current);
               longPressTimer.current = null;
           }
