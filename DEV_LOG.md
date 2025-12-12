@@ -1,5 +1,24 @@
 # PinSeeker Web - Development Log
 
+## Version: V6.4.13
+**Date:** 2024-05-27
+**Branch:** `V6.4`
+**Summary:** Config Corruption & Runtime Fix
+
+### 1. Build System Repair (Critical)
+- **.npmrc Restoration**: 
+  - **Issue**: The build logs confirmed `.npmrc` was corrupted with binary characters (`npm warn Unknown project config`), preventing `legacy-peer-deps` from working and causing installation failures.
+  - **Fix**: Re-generated `.npmrc` as a clean plain-text file.
+- **Cache Invalidation**:
+  - **Fix**: Bumped version to `6.4.13` to force a clean build.
+
+### 2. Runtime Environment Fix (Critical)
+- **Index.html Cleanup**:
+  - **Issue**: The `index.html` file still contained the `importmap` pointing to React 19. This causes the "White Screen of Death" by loading a conflicting React version.
+  - **Fix**: Removed the `importmap` block entirely. The app now correctly uses the bundled React 18 dependencies.
+
+---
+
 ## Version: V6.4.12
 **Date:** 2024-05-27
 **Branch:** `V6.4`
