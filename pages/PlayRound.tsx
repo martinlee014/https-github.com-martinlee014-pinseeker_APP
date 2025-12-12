@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext, useMemo, useRef, Fragment } from 'react';
+import React, { useState, useEffect, useContext, useMemo, useRef, Fragment } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Polyline, Polygon, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
@@ -9,7 +9,7 @@ import * as MathUtils from '../services/mathUtils';
 import { ClubStats, HoleScore, ShotRecord, RoundHistory, LatLng } from '../types';
 import ClubSelector from '../components/ClubSelector';
 import { ScoreModal, ShotConfirmModal, HoleSelectorModal, FullScorecardModal } from '../components/Modals';
-import { Flag, Navigation, Wind, ChevronLeft, Grid, RefreshCw, ListChecks, ArrowLeft, ArrowRight, BrainCircuit, Target } from 'lucide-react';
+import { Flag, Wind, ChevronLeft, Grid, ListChecks, ArrowLeft, ArrowRight, ChevronDown, MapPin } from 'lucide-react';
 
 // --- Icons Setup ---
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -99,6 +99,28 @@ const createReplayLabelIcon = (text: string, rotation: number) => new L.DivIcon(
   iconAnchor: [0, 0] 
 });
 
+const createDistanceLabelIcon = (text: string, rotation: number) => new L.DivIcon({
+  className: 'custom-label-icon',
+  html: `
+    <div style='
+      transform: rotate(${rotation}deg); 
+      color: #ffffff; 
+      font-weight: 700;
+      font-size: 10px; 
+      text-align: center; 
+      white-space: nowrap;
+      background-color: rgba(0,0,0,0.7);
+      padding: 2px 6px;
+      border-radius: 4px;
+      display: inline-block;
+      border: 1px solid rgba(255,255,255,0.2);
+    '>
+      ${text}
+    </div>`,
+  iconSize: [0, 0], 
+  iconAnchor: [20, 10] 
+});
+
 // Refactored to include Long Press detection for touch devices
 const RotatedMapHandler = ({ rotation, onLongPress }: { rotation: number, onLongPress: (latlng: LatLng) => void }) => {
   const map = useMap();
@@ -155,13 +177,11 @@ const RotatedMapHandler = ({ rotation, onLongPress }: { rotation: number, onLong
 
       // --- Multi-touch Detection (Pinch Zoom Fix) ---
       if (window.TouchEvent && e instanceof TouchEvent && e.touches.length > 1) {
-          // If a second finger touches, CANCEL any pending long press
           if (longPressTimer.current) {
               clearTimeout(longPressTimer.current);
               longPressTimer.current = null;
           }
           isDragging.current = false;
-          // Do not proceed with custom drag logic for multi-touch
           return;
       }
 
@@ -175,15 +195,12 @@ const RotatedMapHandler = ({ rotation, onLongPress }: { rotation: number, onLong
           handleLongPress(pos);
       }, 600);
 
-      // Only prevent default if it's a single touch to allow scrolling/panning 
-      // but in rotated map we handle pan manually, so strictly speaking:
       if(e.cancelable && (!window.TouchEvent || !(e instanceof TouchEvent))) {
          e.preventDefault(); 
       }
     };
 
     const handleMove = (e: MouseEvent | TouchEvent) => {
-      // --- Multi-touch Detection Check ---
       if (window.TouchEvent && e instanceof TouchEvent && e.touches.length > 1) {
           if (longPressTimer.current) {
               clearTimeout(longPressTimer.current);
@@ -304,6 +321,10 @@ const PlayRound = () => {
   const [windSpeed, setWindSpeed] = useState(5);
   const [windDir, setWindDir] = useState(180);
   const [showWind, setShowWind] = useState(false);
+  
+  // GPS Button Logic Refs
+  const gpsPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isLongPressAction = useRef(false);
 
   const hole = DUVENHOF_HOLES[currentHoleIdx];
 
@@ -362,7 +383,10 @@ const PlayRound = () => {
   const distLandingToGreen = useMemo(() => MathUtils.calculateDistance(predictedLanding, hole.green), [predictedLanding, hole]);
 
   const ellipsePoints = useMemo(() => MathUtils.getEllipsePoints(
-    predictedLanding, selectedClub.sideError, selectedClub.depthError, 90 - shotBearing
+    predictedLanding, 
+    selectedClub.depthError * 2, 
+    selectedClub.sideError * 2,  
+    90 - shotBearing
   ).map(p => [p.lat, p.lng] as [number, number]), [predictedLanding, selectedClub, shotBearing]);
 
   const holeShots = useMemo(() => shots.filter(s => s.holeNumber === hole.number), [shots, hole.number]);
@@ -370,6 +394,16 @@ const PlayRound = () => {
       if (!isReplay) return [];
       return [hole.tee, hole.green, ...holeShots.map(s => s.to)];
   }, [isReplay, hole, holeShots]);
+
+  const guideLinePoints = useMemo(() => [
+      [predictedLanding.lat, predictedLanding.lng],
+      [hole.green.lat, hole.green.lng]
+  ], [predictedLanding, hole]);
+
+  const guideLabelPos = useMemo(() => ({
+      lat: predictedLanding.lat + (hole.green.lat - predictedLanding.lat) * 0.33,
+      lng: predictedLanding.lng + (hole.green.lng - predictedLanding.lng) * 0.33
+  }), [predictedLanding, hole]);
 
   useEffect(() => {
     if (!isReplay && bag.length > 0) {
@@ -391,16 +425,6 @@ const PlayRound = () => {
     return sorted[sorted.length-1].name;
   }, [distLandingToGreen, bag]);
 
-  const outcomeDescription = useMemo(() => {
-    const d = useYards ? distLandingToGreen * 1.09361 : distLandingToGreen;
-    const val = Math.round(d);
-    if (val < 20) return "Greenside (Chip/Putt)";
-    if (val < 100) return "Wedge Range";
-    if (val < 150) return "Scoring Iron";
-    if (val < 200) return "Long Iron/Hybrid";
-    return "Layup / Par 5";
-  }, [distLandingToGreen, useYards]);
-
   const handleMapClick = (latlng: any) => {
     if (isReplay) return;
     const clicked: LatLng = { lat: latlng.lat, lng: latlng.lng };
@@ -418,6 +442,7 @@ const PlayRound = () => {
     setPendingShot({ pos, isGPS: false, dist });
   };
 
+  // --- GPS Logic for Short Press (Record Shot / Landing Point) ---
   const initiateGPSShot = () => {
     if (!navigator.geolocation) {
       alert("Geolocation not supported");
@@ -433,6 +458,48 @@ const PlayRound = () => {
     );
   };
 
+  // --- GPS Logic for Long Press (Update Tee/Start Position) ---
+  const setTeeToGPS = () => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition((pos) => {
+      const gpsPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      setCurrentBallPos(gpsPos);
+      if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
+      alert("Starting position moved to current GPS location.");
+    }, (err) => alert("GPS Error: " + err.message));
+  };
+
+  const handleGPSButtonStart = (e: React.MouseEvent | React.TouchEvent) => {
+    // Prevent default to avoid scrolling on mobile or duplicate events
+    if(e.cancelable) e.preventDefault();
+    
+    isLongPressAction.current = false;
+    
+    // Clear any existing timer
+    if (gpsPressTimer.current) clearTimeout(gpsPressTimer.current);
+
+    gpsPressTimer.current = setTimeout(() => {
+       isLongPressAction.current = true;
+       if (navigator.vibrate) navigator.vibrate(100);
+       setTeeToGPS(); // Execute Long Press Action
+    }, 800); // 800ms long press threshold
+  };
+
+  const handleGPSButtonEnd = (e: React.MouseEvent | React.TouchEvent) => {
+    if(e.cancelable) e.preventDefault();
+    
+    if (gpsPressTimer.current) {
+      clearTimeout(gpsPressTimer.current);
+      gpsPressTimer.current = null;
+    }
+    
+    // If it wasn't a long press (and timer was cleared before firing), it's a click
+    if (!isLongPressAction.current) {
+        initiateGPSShot();
+    }
+    isLongPressAction.current = false;
+  };
+
   const confirmShot = () => {
     if (!pendingShot) return;
     const targetHole = hole || DUVENHOF_HOLES[currentHoleIdx];
@@ -444,12 +511,11 @@ const PlayRound = () => {
           to: pendingShot.pos,
           clubUsed: selectedClub.name,
           distance: pendingShot.dist,
-          // Save the current plan data for later analysis (Did I hit the circle?)
           plannedInfo: {
             target: predictedLanding,
             dispersion: {
-              width: selectedClub.sideError,
-              depth: selectedClub.depthError,
+              width: selectedClub.depthError * 2, 
+              depth: selectedClub.sideError * 2,  
               rotation: 90 - shotBearing
             }
           }
@@ -462,15 +528,6 @@ const PlayRound = () => {
     } catch(err) {
         console.error("Error saving shot:", err);
     }
-  };
-
-  const setTeeToGPS = () => {
-    if (!navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition((pos) => {
-      const gpsPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-      setCurrentBallPos(gpsPos);
-      alert("Tee position updated to current location.");
-    });
   };
 
   const saveHoleScore = (putts: number, pens: number) => {
@@ -533,7 +590,6 @@ const PlayRound = () => {
                   const curvePoints = MathUtils.getArcPoints(s.from, s.to);
                   const startIcon = s.shotNumber === 1 ? startMarkerIcon : ballIcon;
                   
-                  // Calculate planned dispersion ellipse for replay if available
                   let plannedEllipse = [];
                   if (s.plannedInfo) {
                     plannedEllipse = MathUtils.getEllipsePoints(
@@ -547,14 +603,12 @@ const PlayRound = () => {
                   return (
                     <Fragment key={i}>
                         <Marker position={[s.from.lat, s.from.lng]} icon={startIcon} />
-                        {/* Actual Shot Path */}
                         <Polyline positions={[[s.from.lat, s.from.lng], [s.to.lat, s.to.lng]]} pathOptions={{ color: "black", weight: 4, opacity: 0.3 }} />
                         <Polyline positions={curvePoints.map(p => [p.lat, p.lng])} pathOptions={{ color: "white", weight: 2, opacity: 0.8 }} />
                         
                         {isReplay ? (
                             <>
                               <Marker position={[s.to.lat, s.to.lng]} icon={createReplayLabelIcon(`${s.clubUsed} - ${MathUtils.formatDistance(s.distance, useYards)}`, -mapRotation)} />
-                              {/* Show where the player AIMED vs where it LANDED */}
                               {plannedEllipse.length > 0 && (
                                 <Polygon positions={plannedEllipse} pathOptions={{ color: '#fbbf24', fillColor: '#fbbf24', fillOpacity: 0.1, weight: 1, dashArray: '4,4' }} />
                               )}
@@ -566,18 +620,14 @@ const PlayRound = () => {
                   );
               })}
 
-              {/* Planning / Strategy Visualization (Active Round Only) */}
               {!isReplay && (
                   <>
                       <Marker position={[currentBallPos.lat, currentBallPos.lng]} icon={shotNum === 1 ? startMarkerIcon : ballIcon} />
-                      {/* Straight Line for Planning */}
                       <Polyline positions={[[currentBallPos.lat, currentBallPos.lng], [predictedLanding.lat, predictedLanding.lng]]} pathOptions={{ color: "#3b82f6", weight: 3, dashArray: "5, 5" }} />
-                      
-                      {/* Predicted Dispersion Circle */}
                       <Polygon positions={ellipsePoints} pathOptions={{ color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.2, weight: 1 }} />
-                      
-                      {/* Arrow at the Tip (Target) */}
                       <Marker position={[predictedLanding.lat, predictedLanding.lng]} icon={createArrowIcon(shotBearing)} />
+                      <Polyline positions={guideLinePoints as any} pathOptions={{ color: "#fbbf24", weight: 2, dashArray: "4, 6", opacity: 0.8 }} />
+                      <Marker position={[guideLabelPos.lat, guideLabelPos.lng]} icon={createDistanceLabelIcon(`Leaves ${MathUtils.formatDistance(distLandingToGreen, useYards)}`, -mapRotation)} />
                   </>
               )}
             </MapContainer>
@@ -598,7 +648,7 @@ const PlayRound = () => {
         <div className="text-center mt-1 drop-shadow-lg pointer-events-none">
           <h2 className="text-2xl font-black text-white drop-shadow-md">HOLE {hole.number}</h2>
           <div className="flex items-center justify-center gap-2 text-xs font-bold bg-black/60 rounded-full px-3 py-1 backdrop-blur-md inline-flex border border-white/10 shadow-lg">
-            <span className="text-gray-300">PAR {hole.par}</span><span className="text-gray-500">|</span><span className="text-green-400">{MathUtils.formatDistance(distToGreen, useYards)}</span>
+            <span className="text-gray-300">PAR {hole.par}</span><span className="text-gray-500">|</span><span className="text-white">{MathUtils.formatDistance(distToGreen, useYards)}</span>
           </div>
         </div>
         <div className="pointer-events-auto flex flex-col gap-2">
@@ -620,68 +670,63 @@ const PlayRound = () => {
 
       {/* Bottom Controls */}
       {!isReplay ? (
-        <div className="absolute bottom-0 w-full z-20 pt-6 px-4 bg-gradient-to-t from-black/95 via-black/80 to-transparent backdrop-blur-[2px]" style={{ paddingBottom: 'calc(2rem + env(safe-area-inset-bottom))' }}>
-            {/* Shot Info & Aim Slider */}
-            <div className="flex items-center gap-4 mb-4 bg-black/60 backdrop-blur-md p-2 rounded-xl border border-white/5 shadow-lg">
-                <div className="text-gray-300 text-xs uppercase font-bold tracking-wider flex items-center gap-2 whitespace-nowrap px-2">
-                   Shot {shotNum}
-                   {shotNum === 1 && (
-                     <button onClick={setTeeToGPS} className="text-blue-400 bg-blue-900/30 px-2 py-0.5 rounded text-[10px] flex items-center gap-1 border border-blue-500/30 hover:bg-blue-900/50"><RefreshCw size={10} /> GPS</button>
-                   )}
-                </div>
-                <div className="flex items-center gap-2 flex-1">
-                    <span className="text-xs font-bold text-gray-500">AIM</span>
-                    <input type="range" min="-45" max="45" value={aimAngle} onChange={(e) => setAimAngle(parseInt(e.target.value))} className="flex-1 accent-green-600 h-2 bg-gray-700/50 rounded-lg appearance-none cursor-pointer" />
-                    <span className="text-xs font-bold text-white w-8 text-right">{aimAngle}°</span>
-                </div>
-            </div>
-            
-            <div className="flex gap-3 mb-4 h-36">
-                <div className="flex-1 bg-gray-900/80 backdrop-blur-md rounded-2xl p-3 border border-white/10 flex flex-col justify-between shadow-xl relative overflow-hidden">
-                    <div className="flex justify-between items-center border-b border-white/10 pb-2 mb-1">
-                        <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Projected Outcome</span>
-                        <BrainCircuit size={14} className="text-blue-400" />
+        <>
+            {/* New Main Controls Container */}
+            <div className="absolute bottom-0 w-full z-30 pt-2 px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] bg-gradient-to-t from-black/95 via-black/80 to-transparent">
+                
+                {/* Aim Slider Row */}
+                <div className="flex items-center gap-3 mb-3 bg-gray-900/90 backdrop-blur-md p-2 rounded-xl border border-white/5 shadow-lg">
+                     <div className="text-gray-400 text-[10px] font-bold uppercase tracking-wider pl-1">
+                       Shot {shotNum}
                     </div>
-                    <div className="grid grid-cols-2 gap-2 text-center">
-                        <div className="flex flex-col items-start">
-                            <span className="text-[9px] uppercase text-gray-500 font-bold">Total Carry</span>
-                            <span className="text-base font-bold text-white leading-none mt-1">{MathUtils.formatDistance(playsLike, useYards)}</span>
-                        </div>
-                        <div className="flex flex-col items-end">
-                            <span className="text-[9px] uppercase text-yellow-500 font-bold">Leaves</span>
-                            <span className="text-base font-bold text-yellow-400 leading-none mt-1">{MathUtils.formatDistance(distLandingToGreen, useYards)}</span>
-                        </div>
-                    </div>
-                    <div className="mt-2 bg-black/40 rounded-lg p-2 flex items-center justify-between border border-white/5">
-                        <div className="flex flex-col">
-                            <span className="text-[9px] text-gray-400 mb-0.5">Next Shot</span>
-                            <span className="text-[10px] text-gray-300 leading-tight">{outcomeDescription}</span>
-                        </div>
-                        <div className="text-right pl-2 border-l border-white/10">
-                            <span className="text-[9px] text-green-400 block uppercase font-bold mb-0.5">Rec. Club</span>
-                            <span className="text-sm font-bold text-white">{nextClubSuggestion}</span>
-                        </div>
+                    <div className="flex items-center gap-2 flex-1">
+                        <span className="text-[10px] font-bold text-gray-500">AIM</span>
+                        <input type="range" min="-45" max="45" value={aimAngle} onChange={(e) => setAimAngle(parseInt(e.target.value))} className="flex-1 accent-white h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer" />
+                        <span className="text-[10px] font-bold text-gray-300 w-6 text-right">{aimAngle}°</span>
                     </div>
                 </div>
 
-                <div className="w-[35%] flex flex-col">
-                    <div className="flex-1 relative h-full">
-                       <ClubSelector clubs={bag} selectedClub={selectedClub} onSelect={setSelectedClub} useYards={useYards} />
-                        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center bg-green-700/80 backdrop-blur-md rounded-2xl shadow-xl border border-green-500/30">
-                            <span className="text-[9px] text-green-200 uppercase font-bold tracking-widest mb-1 opacity-80">Select</span>
-                            <span className="text-2xl font-black text-white leading-none tracking-tight text-center px-1">{selectedClub.name}</span>
-                            <div className="h-0.5 w-8 bg-green-400/50 my-2 rounded-full"></div>
-                            <span className="text-[10px] text-white font-bold">{MathUtils.formatDistance(useYards ? selectedClub.carry * 1.09361 : selectedClub.carry, useYards)}</span>
-                        </div>
-                         <style>{`.relative select { opacity: 0; position: absolute; inset: 0; height: 100%; width: 100%; z-index: 10; cursor: pointer; }`}</style>
+                {/* Main Action Row: Simplified UI 1:1 Split */}
+                <div className="flex gap-3 h-16 items-stretch">
+                    {/* 1. Combined Info Panel (Club + Stats) */}
+                    <div className="flex-1 relative bg-gray-900 rounded-2xl border border-white/5 shadow-xl overflow-hidden flex">
+                         {/* Invisible Select overlay */}
+                         <div className="absolute inset-0 z-10 opacity-0"><ClubSelector clubs={bag} selectedClub={selectedClub} onSelect={setSelectedClub} useYards={useYards} /></div>
+
+                         {/* Left Side: Club Selection */}
+                         <div className="flex-1 flex flex-col justify-center pl-4 pr-1 border-r border-white/5 pointer-events-none">
+                             <span className="text-[9px] text-gray-500 uppercase font-bold tracking-widest mb-0.5 flex items-center gap-1">Club <ChevronDown size={8}/></span>
+                             <div className="text-xl font-bold text-white truncate leading-none">{selectedClub.name}</div>
+                             <div className="text-[10px] text-gray-500 mt-1">
+                                {MathUtils.formatDistance(useYards ? selectedClub.carry * 1.09361 : selectedClub.carry, useYards)}
+                             </div>
+                         </div>
+
+                         {/* Right Side: Leaves / Rec */}
+                         <div className="flex-1 flex flex-col justify-center items-end pr-4 pl-1 pointer-events-none bg-gray-800/30">
+                             <span className="text-[9px] text-gray-500 uppercase font-bold tracking-widest mb-0.5">Leaves</span>
+                             <div className="text-xl font-bold text-white leading-none">{MathUtils.formatDistance(distLandingToGreen, useYards)}</div>
+                             <div className="text-[10px] text-gray-500 mt-1 text-right truncate w-full">
+                                Rec: <span className="text-white font-medium">{nextClubSuggestion}</span>
+                             </div>
+                         </div>
                     </div>
+
+                    {/* 2. GPS Record Button - Dual Function */}
+                    <button 
+                       onMouseDown={handleGPSButtonStart}
+                       onMouseUp={handleGPSButtonEnd}
+                       onMouseLeave={handleGPSButtonEnd}
+                       onTouchStart={handleGPSButtonStart}
+                       onTouchEnd={handleGPSButtonEnd}
+                       className="w-16 flex-none bg-emerald-600 active:bg-emerald-500 text-white rounded-2xl flex flex-col items-center justify-center shadow-lg shadow-emerald-900/20 border border-white/5 transition-all select-none"
+                    >
+                        <MapPin size={24} fill="currentColor" className="text-white/90 mb-0.5" />
+                        <span className="text-[8px] font-bold opacity-70">GPS</span>
+                    </button>
                 </div>
             </div>
-
-            <button onClick={initiateGPSShot} className="w-full bg-blue-600/90 hover:bg-blue-500 backdrop-blur-sm text-white font-bold py-3.5 rounded-2xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-900/40 border border-blue-400/20 active:scale-95 active:shadow-none">
-                <Navigation size={18} /> Record Shot Location (GPS)
-            </button>
-        </div>
+        </>
       ) : (
         <div className="absolute bottom-0 w-full z-20 bg-gradient-to-t from-black via-black/90 to-transparent p-4 flex items-center justify-between pointer-events-none" style={{ paddingBottom: 'calc(2rem + env(safe-area-inset-bottom))' }}>
            <button onClick={() => currentHoleIdx > 0 && loadHole(currentHoleIdx - 1)} disabled={currentHoleIdx === 0} className={`pointer-events-auto p-3 rounded-xl flex items-center gap-2 font-bold backdrop-blur-md border border-white/10 shadow-lg ${currentHoleIdx === 0 ? 'text-gray-500 bg-gray-900/50' : 'text-white bg-gray-800/80 hover:bg-gray-700/80'}`}><ArrowLeft size={20} /> Prev</button>

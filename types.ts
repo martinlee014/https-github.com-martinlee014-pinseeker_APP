@@ -28,9 +28,12 @@ export interface ShotRecord {
   plannedInfo?: {
     target: LatLng; // The center of the ellipse aimed at
     dispersion: {
-      width: number; // sideError
-      depth: number; // depthError
-      rotation: number; // 90 - shotBearing
+      // Note: In the context of the ellipse rotation (90-bearing),
+      // 'width' here represents the axis aligned with the shot direction (Depth/Distance Error Diameter)
+      // 'depth' here represents the axis perpendicular to the shot (Side/Lateral Error Diameter)
+      width: number; 
+      depth: number; 
+      rotation: number; 
     };
   };
 }

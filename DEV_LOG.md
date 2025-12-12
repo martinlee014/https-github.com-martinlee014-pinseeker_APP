@@ -1,5 +1,32 @@
 # PinSeeker Web - Development Log
 
+## Version: V7.4.0 (Simplified UI & Smart GPS)
+**Date:** 2024-05-28
+**Branch:** `main`
+
+### Features
+- **UI Simplification**: Refactored the bottom control panel to a strict 1:1 split layout for better visual balance.
+  - **Colors**: Reduced color palette to Greyscale + White + Emerald Green for a cleaner, professional look.
+  - **Typography**: Improved legibility with consistent font sizes and spacing.
+- **Dual-Function GPS Button**: 
+  - **Short Press (Tap)**: Records the current location as the landing spot (Shot result).
+  - **Long Press (>800ms)**: Updates the *Starting* position (Tee box) to the current GPS location. Includes haptic feedback (vibration) for confirmation.
+- **Ergonomics**: 
+  - Optimized the Club Selector overlay to maximize touch target size.
+  - Removed redundant "REC" text, favoring clear iconography.
+
+## Version: V7.3.0 (UI/UX Refinement & Ergonomics)
+**Date:** 2024-05-28
+**Branch:** `main`
+
+### Features
+- **Map Visibility**: Removed the bulky "Projected Outcome" panel. Key statistics (Total Carry, Leaves Distance, Rec. Club) are now displayed in a **transparent overlay bar** at the very bottom of the screen to minimize map obstruction.
+- **Visual Guides**: Added a dashed **Guide Line** connecting the predicted landing zone to the green.
+  - Includes a floating label at the 1/3 mark showing the exact "Leaves" distance to the pin.
+- **Control Layout**: Reorganized the bottom control area:
+  - **Aim Slider**: Moved to a dedicated row above the main controls.
+  - **Action Row**: Club Selector and GPS Record button are now side-by-side for easier one-handed access.
+
 ## Version: V7.2.0 (Strategy & Visual Overhaul)
 **Date:** 2024-05-28
 **Branch:** `main`
