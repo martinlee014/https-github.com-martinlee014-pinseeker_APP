@@ -1,6 +1,7 @@
+
 import { useContext, useEffect, useState } from 'react';
 import { AppContext } from '../App';
-import { BookOpen, Ruler, Briefcase, Download, Smartphone, Share, PlusSquare, Info } from 'lucide-react';
+import { BookOpen, Ruler, Briefcase, Download, Smartphone, Share, PlusSquare, Info, Map } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ModalOverlay } from '../components/Modals';
 
@@ -95,6 +96,21 @@ const Settings = () => {
             <div className="text-gray-600 group-hover:text-white transition-colors">→</div>
         </button>
 
+        {/* Course Database */}
+        <button 
+            onClick={() => navigate('/settings/courses')}
+            className="w-full bg-gray-900 rounded-xl p-4 flex items-center gap-3 border border-gray-800 hover:bg-gray-800 transition-colors group"
+        >
+            <div className="bg-gray-800 p-2 rounded-lg group-hover:bg-gray-700 transition-colors">
+                <Map className="text-emerald-400" size={20} />
+            </div>
+            <div className="text-left flex-1">
+                <div className="font-medium text-white">Course Database</div>
+                <div className="text-xs text-gray-500">Add, edit, and contribute course maps</div>
+            </div>
+            <div className="text-gray-600 group-hover:text-white transition-colors">→</div>
+        </button>
+
         {/* Manual */}
         <button 
             onClick={() => navigate('/manual')}
@@ -111,11 +127,12 @@ const Settings = () => {
       </div>
       
       <div className="text-center text-xs text-gray-600 mt-10">
-          PinSeeker Web v7.6.0
+          PinSeeker Web v7.7.2
       </div>
 
       {showInstallHelp && (
         <ModalOverlay onClose={() => setShowInstallHelp(false)}>
+           {/* Modal content same as before */}
            <div className="p-6 text-center">
              {isIOS ? (
                  <>

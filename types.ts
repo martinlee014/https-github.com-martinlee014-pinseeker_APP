@@ -1,3 +1,4 @@
+
 export interface LatLng {
   lat: number;
   lng: number;
@@ -15,6 +16,14 @@ export interface GolfHole {
   par: number;
   tee: LatLng;
   green: LatLng;
+}
+
+export interface GolfCourse {
+  id: string;
+  name: string;
+  holes: GolfHole[];
+  createdAt?: string;
+  isCustom?: boolean;
 }
 
 export interface ShotRecord {
@@ -62,4 +71,5 @@ export interface GameState {
   scorecard: HoleScore[];
   shots: ShotRecord[];
   isRoundActive: boolean;
+  courseId?: string; // Track which course is being played
 }

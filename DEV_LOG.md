@@ -1,4 +1,21 @@
+
 # PinSeeker Web - Development Log
+
+## Version: V7.7.2 (Course Editor Overhaul)
+**Date:** 2024-05-28
+**Branch:** `main`
+**Status:** ✅ RELEASED
+
+### Features
+- **Full Course Visualization**: The Course Editor now renders all 18 holes simultaneously. Users can see the entire course layout, hole-to-hole flow, and distances at a glance.
+- **Visual Cues**:
+  - **Connection Lines**: Dashed lines connect Tee to Green (White for active hole, Yellow for recorded history).
+  - **Direction Arrows**: Added directional markers to visual lines to indicate the line of play clearly.
+  - **Info Labels**: Floating labels display Hole #, Par, and Distance for every recorded hole on the map.
+- **Ergonomic UI Redesign**:
+  - **Compact Control Panel**: Reduced the height of the editor's bottom panel by ~40% to maximize map visibility.
+  - **Integrated Par Controls**: Par adjustment is now directly accessible in the header.
+- **Pre-Save Verification**: Added a "Course Summary" modal that appears before finishing. It provides a table view of all holes to verify Par and Distances, and calculates the total course stats automatically.
 
 ## Version: V7.6.0 (Visual Wind Vane)
 **Date:** 2024-05-28

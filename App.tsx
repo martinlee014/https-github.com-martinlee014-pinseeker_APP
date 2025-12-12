@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { HashRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { User, LogOut, Play, Map as MapIcon, Settings as SettingsIcon } from 'lucide-react';
@@ -12,6 +13,8 @@ import RoundSummary from './pages/RoundSummary';
 import Settings from './pages/Settings';
 import UserManual from './pages/UserManual';
 import ClubManagement from './pages/ClubManagement';
+import CourseManager from './pages/CourseManager';
+import CourseEditor from './pages/CourseEditor';
 
 // Global Context for simple state sharing
 export const AppContext = createContext<{
@@ -38,12 +41,13 @@ const MainLayout = ({ children }: { children?: ReactNode }) => {
   const { logout } = useContext(AppContext);
 
   const isPlayMode = location.pathname.startsWith('/play');
+  const isEditorMode = location.pathname.includes('/edit');
 
   return (
     // Changed h-screen to h-[100dvh] to handle mobile browser bars correctly
     <div className="flex flex-col h-[100dvh] max-w-md mx-auto bg-black relative shadow-2xl overflow-hidden">
       {/* Header */}
-      {!isPlayMode && (
+      {!isPlayMode && !isEditorMode && (
         <header className="flex items-center justify-between p-4 bg-gray-900 border-b border-gray-800 z-10 shrink-0">
           <div className="flex items-center gap-2" onClick={() => navigate('/dashboard')}>
             <MapIcon className="text-green-500" />
@@ -60,8 +64,8 @@ const MainLayout = ({ children }: { children?: ReactNode }) => {
         {children}
       </main>
 
-      {/* Bottom Nav - Hide in Play Mode */}
-      {!isPlayMode && (
+      {/* Bottom Nav - Hide in Play Mode or Editor Mode */}
+      {!isPlayMode && !isEditorMode && (
         <nav className="flex justify-around items-center p-3 bg-gray-900 border-t border-gray-800 z-10 shrink-0 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
           <NavItem icon={<User size={24} />} label="Dash" path="/dashboard" active={location.pathname === '/dashboard'} />
           <div className="relative -top-5">
@@ -133,6 +137,8 @@ const App = () => {
           <Route path="/summary" element={<ProtectedRoute user={user}><MainLayout><RoundSummary /></MainLayout></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute user={user}><MainLayout><Settings /></MainLayout></ProtectedRoute>} />
           <Route path="/settings/clubs" element={<ProtectedRoute user={user}><MainLayout><ClubManagement /></MainLayout></ProtectedRoute>} />
+          <Route path="/settings/courses" element={<ProtectedRoute user={user}><MainLayout><CourseManager /></MainLayout></ProtectedRoute>} />
+          <Route path="/settings/courses/edit" element={<ProtectedRoute user={user}><MainLayout><CourseEditor /></MainLayout></ProtectedRoute>} />
           <Route path="/manual" element={<ProtectedRoute user={user}><MainLayout><UserManual /></MainLayout></ProtectedRoute>} />
         </Routes>
       </HashRouter>

@@ -1,9 +1,11 @@
-import { RoundHistory, ClubStats } from "../types";
-import { DEFAULT_BAG } from "../constants";
+
+import { RoundHistory, ClubStats, GolfCourse } from "../types";
+import { DEFAULT_BAG, DUVENHOF_COURSE } from "../constants";
 
 const KEY_USER = 'pinseeker_current_user';
 const KEY_SETTINGS_UNIT = 'pinseeker_unit_system';
 const KEY_CLUB_BAG = 'pinseeker_club_bag';
+const KEY_CUSTOM_COURSES = 'pinseeker_custom_courses';
 
 export const StorageService = {
   getCurrentUser: (): string | null => {
@@ -42,6 +44,39 @@ export const StorageService = {
   resetBag: () => {
     localStorage.setItem(KEY_CLUB_BAG, JSON.stringify(DEFAULT_BAG));
     return DEFAULT_BAG;
+  },
+  
+  // --- Course Management ---
+  getCustomCourses: (): GolfCourse[] => {
+    const data = localStorage.getItem(KEY_CUSTOM_COURSES);
+    if (data) {
+      return JSON.parse(data);
+    }
+    return [];
+  },
+
+  getAllCourses: (): GolfCourse[] => {
+    const custom = StorageService.getCustomCourses();
+    return [DUVENHOF_COURSE, ...custom];
+  },
+
+  saveCustomCourse: (course: GolfCourse) => {
+    const courses = StorageService.getCustomCourses();
+    const existingIdx = courses.findIndex(c => c.id === course.id);
+    
+    if (existingIdx >= 0) {
+      courses[existingIdx] = course;
+    } else {
+      courses.push(course);
+    }
+    
+    localStorage.setItem(KEY_CUSTOM_COURSES, JSON.stringify(courses));
+  },
+
+  deleteCustomCourse: (courseId: string) => {
+    const courses = StorageService.getCustomCourses();
+    const newCourses = courses.filter(c => c.id !== courseId);
+    localStorage.setItem(KEY_CUSTOM_COURSES, JSON.stringify(newCourses));
   },
   // -----------------------
 
