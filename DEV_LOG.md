@@ -1,5 +1,17 @@
 # PinSeeker Web - Development Log
 
+## Version: V6.4.4
+**Date:** 2024-05-27
+**Branch:** `V6.4`
+**Summary:** Deployment Rescue & Config Clean
+
+### 1. Deployment Fixes
+- **Pinned Dependencies**: Modified `package.json` to use exact version `"lucide-react": "0.344.0"`. This prevents the build server from resolving to newer versions that might conflict with React 18.
+- **Legacy Peer Deps**: Added clean `.npmrc` to enforce `legacy-peer-deps=true`, solving the `ERESOLVE` errors on Vercel.
+- **Removed Importmap**: Deleted the persistent `importmap` block in `index.html` that was forcing an incompatible React 19 version.
+
+---
+
 ## Version: V6.4.3
 **Date:** 2024-05-27
 **Branch:** `V6.4`
