@@ -1,5 +1,25 @@
 # PinSeeker Web - Development Log
 
+## Version: V6.4.12
+**Date:** 2024-05-27
+**Branch:** `V6.4`
+**Summary:** Configuration Corruption Fix
+
+### 1. Critical Build Repair
+- **.npmrc Restoration**: 
+  - **Issue**: The build logs showed `npm warn Unknown project config` followed by garbage characters. This indicated the `.npmrc` file was binary/corrupted, preventing `legacy-peer-deps` from working.
+  - **Fix**: Re-wrote `.npmrc` as a clean plain-text file.
+- **Dependency Resolution**:
+  - **Fix**: The clean `.npmrc` now correctly applies `legacy-peer-deps=true`, allowing Vercel to install `react@18` alongside `lucide-react`.
+
+### 2. Runtime Critical Fix
+- **Index.html Cleanup**:
+  - **Issue**: The `index.html` contained a `<script type="importmap">` block pointing to **React 19** on a CDN.
+  - **Impact**: This caused a fatal runtime error ("White Screen of Death") because the application logic is bundled with React 18.
+  - **Fix**: Removed the importmap block completely. The app now loads correctly using the bundled dependencies.
+
+---
+
 ## Version: V6.4.11
 **Date:** 2024-05-27
 **Branch:** `V6.4`
