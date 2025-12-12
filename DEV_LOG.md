@@ -1,5 +1,25 @@
 # PinSeeker Web - Development Log
 
+## Version: V6.1
+**Date:** 2024-05-24
+**Branch:** `V6.1`
+**Summary:** UI 玻璃拟态重构与下一杆策略预测 (Glassmorphism UI Redesign & Next Shot Prediction Engine)
+
+### 1. 核心特性 (Key Features)
+- **下一杆预测引擎 (Next Shot Prediction)**:
+  - 在选择当前球杆时，系统会自动计算落点剩余距离，并推荐**下一杆**需要使用的球杆（例如："选 Driver -> 剩余 120码 -> 下一杆推荐 PW"）。
+  - 增强了策略卡片的信息密度，清晰展示 "Total Carry" (飞行距离) 和 "Leaves" (剩余距离)。
+- **沉浸式地图体验 (Immersive Map UI)**:
+  - 地图容器调整为全屏显示 (`absolute inset-0`)。
+  - 顶部状态栏和底部操作面板改为**悬浮半透明玻璃拟态 (Glassmorphism)** 风格，大幅增加了地图的可视区域，解决了操作面板遮挡发球台的问题。
+  - 优化了文字排版和对比度，确保在深色半透明背景下的可读性。
+
+### 2. 关键修复 (Critical Fixes)
+- **React 版本冲突修复**:
+  - 移除了 `index.html` 中多余的 `importmap` 脚本。该脚本强制浏览器加载 React 19，与项目依赖的 React 18 发生冲突，曾导致 Hooks (`useRef`) 报错崩溃。
+
+---
+
 ## Version: V6.0
 **Date:** 2024-05-23
 **Branch:** `V6.0`

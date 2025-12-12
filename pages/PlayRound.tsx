@@ -9,7 +9,7 @@ import * as MathUtils from '../services/mathUtils';
 import { ClubStats, HoleScore, ShotRecord, RoundHistory, LatLng } from '../types';
 import ClubSelector from '../components/ClubSelector';
 import { ScoreModal, ShotConfirmModal, HoleSelectorModal, FullScorecardModal } from '../components/Modals';
-import { Flag, Navigation, Wind, ChevronLeft, Grid, RefreshCw, ListChecks, ArrowLeft, ArrowRight, BrainCircuit } from 'lucide-react';
+import { Flag, Navigation, Wind, ChevronLeft, Grid, RefreshCw, ListChecks, ArrowLeft, ArrowRight, BrainCircuit, Target, ArrowDownToLine } from 'lucide-react';
 
 // --- Icons Setup ---
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -269,10 +269,6 @@ const PlayRound = () => {
     MathUtils.calculateDistance(predictedLanding, hole.green), 
   [predictedLanding, hole]);
 
-  const strategy = useMemo(() => 
-    MathUtils.getStrategyRecommendation(distLandingToGreen, bag, useYards),
-  [distLandingToGreen, useYards, bag]);
-
   const ellipsePoints = useMemo(() => MathUtils.getEllipsePoints(
     predictedLanding, 
     selectedClub.sideError, 
@@ -286,11 +282,12 @@ const PlayRound = () => {
       return [hole.tee, hole.green, ...holeShots.map(s => s.to)];
   }, [isReplay, hole, holeShots]);
 
+  // Initial club selection recommendation logic
   useEffect(() => {
     if (!isReplay && bag.length > 0) {
       const dist = distToGreen;
+      // Simple logic for default selection:
       if (dist < 50) {
-        // Use smallest club
         setSelectedClub(bag[bag.length - 1]); 
       } else {
         const suitable = [...bag].reverse().find(c => c.carry >= dist - 10);
@@ -298,6 +295,34 @@ const PlayRound = () => {
       }
     }
   }, [currentBallPos, currentHoleIdx, isReplay]);
+
+  // --- Next Shot Prediction Logic ---
+  const nextClubSuggestion = useMemo(() => {
+    if (distLandingToGreen < 20) return "Putter";
+    
+    // Sort bag ascending (Shortest -> Longest)
+    const sorted = [...bag].sort((a,b) => a.carry - b.carry);
+    
+    // Find first club with carry >= remaining distance
+    const match = sorted.find(c => c.carry >= distLandingToGreen);
+    
+    if (match) return match.name;
+    // If distance is longer than driver, suggest Driver/Longest
+    return sorted[sorted.length-1].name;
+  }, [distLandingToGreen, bag]);
+
+  const outcomeDescription = useMemo(() => {
+    const d = useYards ? distLandingToGreen * 1.09361 : distLandingToGreen;
+    const unit = useYards ? 'yd' : 'm';
+    const val = Math.round(d);
+    
+    if (val < 20) return "Greenside (Chip/Putt)";
+    if (val < 100) return "Wedge Range";
+    if (val < 150) return "Scoring Iron";
+    if (val < 200) return "Long Iron/Hybrid";
+    return "Layup / Par 5";
+  }, [distLandingToGreen, useYards]);
+
 
   const handleMapClick = (latlng: any) => {
     if (isReplay) return;
@@ -337,7 +362,6 @@ const PlayRound = () => {
       return;
     }
     
-    // Ensure we have a valid hole. If not, fallback to currentHoleIdx lookup if possible
     const targetHole = hole || DUVENHOF_HOLES[currentHoleIdx];
     if (!targetHole) {
       alert("Error: Hole data missing.");
@@ -358,7 +382,7 @@ const PlayRound = () => {
         setCurrentBallPos(pendingShot.pos);
         setShotNum(prev => prev + 1);
         setAimAngle(0);
-        setPendingShot(null); // Ensure this is called to close modal
+        setPendingShot(null); 
     } catch(err) {
         console.error("Error saving shot:", err);
         alert("Failed to save shot. See console.");
@@ -419,54 +443,8 @@ const PlayRound = () => {
 
   return (
     <div className="h-full relative bg-gray-900 flex flex-col overflow-hidden">
-      <div className="absolute top-0 left-0 right-0 z-[1000] p-3 bg-gradient-to-b from-black/90 to-transparent flex justify-between items-start pointer-events-none">
-        <div className="pointer-events-auto flex flex-col gap-2">
-           <button onClick={() => navigate(-1)} className="bg-black/50 p-2 rounded-full text-white backdrop-blur-sm">
-             <ChevronLeft size={20} />
-           </button>
-           {!isReplay && (
-            <>
-             <button onClick={() => setShowHoleSelect(true)} className="bg-black/50 p-2 rounded-full text-white backdrop-blur-sm mt-1">
-               <Grid size={20} />
-             </button>
-             <button onClick={() => setShowFullCard(true)} className="bg-black/50 p-2 rounded-full text-white backdrop-blur-sm mt-1">
-               <ListChecks size={20} />
-             </button>
-            </>
-           )}
-        </div>
-
-        <div className="text-center mt-1">
-          <h2 className="text-2xl font-black text-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] shadow-black">HOLE {hole.number}</h2>
-          <div className="flex items-center justify-center gap-2 text-xs font-bold bg-black/60 rounded-full px-3 py-1 backdrop-blur-md inline-flex border border-gray-700">
-            <span className="text-gray-300">PAR {hole.par}</span>
-            <span className="text-gray-600">|</span>
-            <span className="text-green-400">{MathUtils.formatDistance(distToGreen, useYards)}</span>
-          </div>
-        </div>
-
-        <div className="pointer-events-auto flex flex-col gap-2">
-           {!isReplay && (
-              <button onClick={() => setShowScoreModal(true)} className="bg-green-600 p-2 rounded-full text-white shadow-lg shadow-green-900/50">
-                  <Flag size={20} fill="white"/>
-              </button>
-           )}
-           <button onClick={() => setShowWind(!showWind)} className={`bg-black/50 p-2 rounded-full ${showWind ? 'text-blue-400' : 'text-gray-400'}`}>
-              <Wind size={20} />
-           </button>
-        </div>
-      </div>
-
-      {showWind && (
-        <div className="absolute top-20 right-14 z-[1000] bg-black/80 backdrop-blur p-3 rounded-xl border border-gray-700 w-40 text-xs text-gray-300">
-            <div className="mb-1 flex justify-between"><span>Speed</span> <span>{windSpeed} m/s</span></div>
-            <input type="range" min="0" max="20" value={windSpeed} onChange={(e) => setWindSpeed(parseInt(e.target.value))} className="w-full accent-blue-500 mb-2 h-1 bg-gray-600 rounded-lg appearance-none" />
-            <div className="mb-1 flex justify-between"><span>Direction</span> <span>{windDir}°</span></div>
-            <input type="range" min="0" max="360" value={windDir} onChange={(e) => setWindDir(parseInt(e.target.value))} className="w-full accent-blue-500 h-1 bg-gray-600 rounded-lg appearance-none" />
-        </div>
-      )}
-
-      <div className="flex-1 relative z-0 overflow-hidden bg-black w-full h-full">
+      {/* Main Map Area - Full Screen & Absolute */}
+      <div className="absolute inset-0 z-0 bg-black w-full h-full">
         <div 
             style={{ 
                 width: '100%', 
@@ -553,13 +531,63 @@ const PlayRound = () => {
         </div>
       </div>
 
+      {/* Top Bar with Controls */}
+      <div className="absolute top-0 left-0 right-0 z-[1000] p-3 pointer-events-none flex justify-between items-start">
+        <div className="pointer-events-auto flex flex-col gap-2">
+           <button onClick={() => navigate(-1)} className="bg-black/50 p-2 rounded-full text-white backdrop-blur-md border border-white/5 hover:bg-black/70 transition-colors">
+             <ChevronLeft size={20} />
+           </button>
+           {!isReplay && (
+            <>
+             <button onClick={() => setShowHoleSelect(true)} className="bg-black/50 p-2 rounded-full text-white backdrop-blur-md border border-white/5 mt-1 hover:bg-black/70">
+               <Grid size={20} />
+             </button>
+             <button onClick={() => setShowFullCard(true)} className="bg-black/50 p-2 rounded-full text-white backdrop-blur-md border border-white/5 mt-1 hover:bg-black/70">
+               <ListChecks size={20} />
+             </button>
+            </>
+           )}
+        </div>
+
+        <div className="text-center mt-1 drop-shadow-lg pointer-events-none">
+          <h2 className="text-2xl font-black text-white drop-shadow-md">HOLE {hole.number}</h2>
+          <div className="flex items-center justify-center gap-2 text-xs font-bold bg-black/60 rounded-full px-3 py-1 backdrop-blur-md inline-flex border border-white/10 shadow-lg">
+            <span className="text-gray-300">PAR {hole.par}</span>
+            <span className="text-gray-500">|</span>
+            <span className="text-green-400">{MathUtils.formatDistance(distToGreen, useYards)}</span>
+          </div>
+        </div>
+
+        <div className="pointer-events-auto flex flex-col gap-2">
+           {!isReplay && (
+              <button onClick={() => setShowScoreModal(true)} className="bg-green-600/90 p-2 rounded-full text-white shadow-lg shadow-green-900/50 backdrop-blur-md border border-white/10 hover:bg-green-500">
+                  <Flag size={20} fill="white"/>
+              </button>
+           )}
+           <button onClick={() => setShowWind(!showWind)} className={`bg-black/50 p-2 rounded-full backdrop-blur-md border border-white/5 hover:bg-black/70 ${showWind ? 'text-blue-400' : 'text-gray-400'}`}>
+              <Wind size={20} />
+           </button>
+        </div>
+      </div>
+
+      {showWind && (
+        <div className="absolute top-20 right-14 z-[1000] bg-black/80 backdrop-blur-md p-3 rounded-xl border border-gray-700 w-40 text-xs text-gray-300 shadow-xl">
+            <div className="mb-1 flex justify-between"><span>Speed</span> <span>{windSpeed} m/s</span></div>
+            <input type="range" min="0" max="20" value={windSpeed} onChange={(e) => setWindSpeed(parseInt(e.target.value))} className="w-full accent-blue-500 mb-2 h-1 bg-gray-600 rounded-lg appearance-none" />
+            <div className="mb-1 flex justify-between"><span>Direction</span> <span>{windDir}°</span></div>
+            <input type="range" min="0" max="360" value={windDir} onChange={(e) => setWindDir(parseInt(e.target.value))} className="w-full accent-blue-500 h-1 bg-gray-600 rounded-lg appearance-none" />
+        </div>
+      )}
+
+      {/* Bottom Controls - Floating Glassmorphism */}
       {!isReplay ? (
-        <div className="bg-gray-900 border-t border-gray-800 p-4 pb-8 space-y-4 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] z-10">
-            <div className="flex items-center gap-4">
-                <div className="text-gray-400 text-xs uppercase font-bold tracking-wider flex items-center gap-2 whitespace-nowrap">
+        <div className="absolute bottom-0 w-full z-20 pb-8 pt-6 px-4 bg-gradient-to-t from-black/95 via-black/80 to-transparent backdrop-blur-[2px]">
+            {/* Shot Info & Aim Slider */}
+            <div className="flex items-center gap-4 mb-4 bg-black/60 backdrop-blur-md p-2 rounded-xl border border-white/5 shadow-lg">
+                <div className="text-gray-300 text-xs uppercase font-bold tracking-wider flex items-center gap-2 whitespace-nowrap px-2">
                    Shot {shotNum}
                    {shotNum === 1 && (
-                     <button onClick={setTeeToGPS} className="text-blue-500 bg-blue-900/30 px-2 py-0.5 rounded text-[10px] flex items-center gap-1 border border-blue-900">
+                     <button onClick={setTeeToGPS} className="text-blue-400 bg-blue-900/30 px-2 py-0.5 rounded text-[10px] flex items-center gap-1 border border-blue-500/30 hover:bg-blue-900/50">
                        <RefreshCw size={10} /> GPS
                      </button>
                    )}
@@ -568,92 +596,102 @@ const PlayRound = () => {
                     <span className="text-xs font-bold text-gray-500">AIM</span>
                     <input 
                         type="range" min="-45" max="45" value={aimAngle} onChange={(e) => setAimAngle(parseInt(e.target.value))}
-                        className="flex-1 accent-green-500 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                        className="flex-1 accent-green-600 h-2 bg-gray-700/50 rounded-lg appearance-none cursor-pointer"
                     />
                     <span className="text-xs font-bold text-white w-8 text-right">{aimAngle}°</span>
                 </div>
             </div>
             
-            <div className="flex gap-3 h-24">
-                <div className="flex-1 bg-gray-800 rounded-xl p-3 flex flex-col justify-between border border-gray-700 relative overflow-hidden">
-                    <div className="absolute top-0 right-0 p-1 opacity-10">
-                      <BrainCircuit size={64} className="text-white"/>
+            {/* Strategy & Club Selector */}
+            <div className="flex gap-3 mb-4 h-36">
+                {/* Revised Strategy Card: Shows Current Shot Outcome & Next Shot Recommendation */}
+                <div className="flex-1 bg-gray-900/80 backdrop-blur-md rounded-2xl p-3 border border-white/10 flex flex-col justify-between shadow-xl relative overflow-hidden">
+                    <div className="flex justify-between items-center border-b border-white/10 pb-2 mb-1">
+                        <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Projected Outcome</span>
+                        <BrainCircuit size={14} className="text-blue-400" />
                     </div>
                     
-                    <div className="z-10">
-                        <div className="text-[10px] text-gray-400 uppercase tracking-wider mb-0.5">Strategy</div>
-                        <div className="text-sm font-bold text-white leading-tight">{strategy.mainAction}</div>
-                        {strategy.subAction && (
-                           <div className="text-xs text-blue-400 mt-0.5">{strategy.subAction}</div>
-                        )}
-                    </div>
-
-                    <div className="flex items-end gap-3 z-10 mt-1">
-                        <div>
-                           <div className="text-[10px] text-gray-500">Carry</div>
-                           <div className="text-white font-bold">{MathUtils.formatDistance(playsLike, useYards)}</div>
+                    {/* Current Shot Stats */}
+                    <div className="grid grid-cols-2 gap-2 text-center">
+                        <div className="flex flex-col items-start">
+                            <span className="text-[9px] uppercase text-gray-500 font-bold">Total Carry</span>
+                            <span className="text-base font-bold text-white leading-none mt-1">{MathUtils.formatDistance(playsLike, useYards)}</span>
                         </div>
-                        <div>
-                           <div className="text-[10px] text-yellow-600">Leave</div>
-                           <div className="text-yellow-400 font-bold">{MathUtils.formatDistance(distLandingToGreen, useYards)}</div>
+                        <div className="flex flex-col items-end">
+                            <span className="text-[9px] uppercase text-yellow-500 font-bold">Leaves</span>
+                            <span className="text-base font-bold text-yellow-400 leading-none mt-1">{MathUtils.formatDistance(distLandingToGreen, useYards)}</span>
+                        </div>
+                    </div>
+                    
+                    {/* Next Shot Prediction Box */}
+                    <div className="mt-2 bg-black/40 rounded-lg p-2 flex items-center justify-between border border-white/5">
+                        <div className="flex flex-col">
+                            <span className="text-[9px] text-gray-400 mb-0.5">Next Shot</span>
+                            <span className="text-[10px] text-gray-300 leading-tight">{outcomeDescription}</span>
+                        </div>
+                        <div className="text-right pl-2 border-l border-white/10">
+                            <span className="text-[9px] text-green-400 block uppercase font-bold mb-0.5">Rec. Club</span>
+                            <span className="text-sm font-bold text-white">{nextClubSuggestion}</span>
                         </div>
                     </div>
                 </div>
 
-                <div className="w-[35%] flex flex-col gap-2">
-                    <div className="flex-1 relative">
-                        <div className="h-full">
-                           <ClubSelector 
-                                clubs={bag} 
-                                selectedClub={selectedClub} 
-                                onSelect={setSelectedClub} 
-                                useYards={useYards}
-                            />
-                            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center bg-green-600 rounded-xl shadow-lg border border-green-500">
-                                <span className="text-xs text-green-200 uppercase font-bold">Club</span>
-                                <span className="text-xl font-black text-white leading-none">{selectedClub.name}</span>
-                            </div>
-                             <style>{`
-                                .h-full select { 
-                                    opacity: 0; 
-                                    position: absolute; 
-                                    inset: 0; 
-                                    height: 100%; 
-                                    width: 100%; 
-                                    z-index: 10;
-                                    cursor: pointer;
-                                }
-                            `}</style>
+                {/* Club Selector Container */}
+                <div className="w-[35%] flex flex-col">
+                    <div className="flex-1 relative h-full">
+                       <ClubSelector 
+                            clubs={bag} 
+                            selectedClub={selectedClub} 
+                            onSelect={setSelectedClub} 
+                            useYards={useYards}
+                        />
+                        {/* Custom overlay for Club Selector */}
+                        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center bg-green-700/80 backdrop-blur-md rounded-2xl shadow-xl border border-green-500/30">
+                            <span className="text-[9px] text-green-200 uppercase font-bold tracking-widest mb-1 opacity-80">Select</span>
+                            <span className="text-2xl font-black text-white leading-none tracking-tight text-center px-1">{selectedClub.name}</span>
+                            <div className="h-0.5 w-8 bg-green-400/50 my-2 rounded-full"></div>
+                            <span className="text-[10px] text-white font-bold">{MathUtils.formatDistance(useYards ? selectedClub.carry * 1.09361 : selectedClub.carry, useYards)}</span>
                         </div>
+                         <style>{`
+                            .relative select { 
+                                opacity: 0; 
+                                position: absolute; 
+                                inset: 0; 
+                                height: 100%; 
+                                width: 100%; 
+                                z-index: 10;
+                                cursor: pointer;
+                            }
+                        `}</style>
                     </div>
                 </div>
             </div>
 
             <button 
                 onClick={initiateGPSShot}
-                className="w-full bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-bold py-3 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-900/20"
+                className="w-full bg-blue-600/90 hover:bg-blue-500 backdrop-blur-sm text-white font-bold py-3.5 rounded-2xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-900/40 border border-blue-400/20 active:scale-95 active:shadow-none"
             >
-                <Navigation size={18} /> Record Shot (GPS)
+                <Navigation size={18} /> Record Shot Location (GPS)
             </button>
         </div>
       ) : (
-        <div className="bg-gray-900 border-t border-gray-800 p-4 pb-8 z-10 flex items-center justify-between">
+        <div className="absolute bottom-0 w-full z-20 bg-gradient-to-t from-black via-black/90 to-transparent p-4 pb-8 flex items-center justify-between pointer-events-none">
            <button 
              onClick={() => currentHoleIdx > 0 && loadHole(currentHoleIdx - 1)}
              disabled={currentHoleIdx === 0}
-             className={`p-3 rounded-xl flex items-center gap-2 font-bold ${currentHoleIdx === 0 ? 'text-gray-600 bg-gray-800' : 'text-white bg-gray-800 hover:bg-gray-700'}`}
+             className={`pointer-events-auto p-3 rounded-xl flex items-center gap-2 font-bold backdrop-blur-md border border-white/10 shadow-lg ${currentHoleIdx === 0 ? 'text-gray-500 bg-gray-900/50' : 'text-white bg-gray-800/80 hover:bg-gray-700/80'}`}
            >
-             <ArrowLeft size={20} /> Prev Hole
+             <ArrowLeft size={20} /> Prev
            </button>
            
-           <span className="text-gray-400 text-sm font-bold">REPLAY MODE</span>
+           <span className="text-gray-400 text-xs font-bold bg-black/80 px-4 py-1.5 rounded-full backdrop-blur-sm border border-gray-800 uppercase tracking-widest shadow-xl">Replay Mode</span>
 
            <button 
              onClick={() => currentHoleIdx < DUVENHOF_HOLES.length - 1 && loadHole(currentHoleIdx + 1)}
              disabled={currentHoleIdx === DUVENHOF_HOLES.length - 1}
-             className={`p-3 rounded-xl flex items-center gap-2 font-bold ${currentHoleIdx === DUVENHOF_HOLES.length - 1 ? 'text-gray-600 bg-gray-800' : 'text-white bg-green-600 hover:bg-green-500'}`}
+             className={`pointer-events-auto p-3 rounded-xl flex items-center gap-2 font-bold backdrop-blur-md border border-white/10 shadow-lg ${currentHoleIdx === DUVENHOF_HOLES.length - 1 ? 'text-gray-500 bg-gray-900/50' : 'text-white bg-green-600/90 hover:bg-green-500/90'}`}
            >
-             Next Hole <ArrowRight size={20} />
+             Next <ArrowRight size={20} />
            </button>
         </div>
       )}

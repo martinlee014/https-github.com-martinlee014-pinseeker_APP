@@ -9,10 +9,12 @@ interface ClubSelectorProps {
 }
 
 const ClubSelector: FC<ClubSelectorProps> = ({ clubs, selectedClub, onSelect, useYards }) => {
+  // Logic is now mostly handled by the parent's overlay for styling, 
+  // but we keep the select functionality here.
   return (
-    <div className="bg-gray-800 rounded-lg p-2 border border-gray-700">
+    <div className="h-full w-full">
       <select 
-        className="bg-transparent text-white font-bold w-full outline-none"
+        className="w-full h-full opacity-0 absolute inset-0 z-10 cursor-pointer"
         value={selectedClub.name}
         onChange={(e) => {
           const club = clubs.find(c => c.name === e.target.value);
@@ -23,7 +25,7 @@ const ClubSelector: FC<ClubSelectorProps> = ({ clubs, selectedClub, onSelect, us
           const carry = useYards ? c.carry * 1.09361 : c.carry;
           const unit = useYards ? 'yd' : 'm';
           return (
-            <option key={c.name} value={c.name} className="bg-gray-800 text-white">
+            <option key={c.name} value={c.name} className="bg-gray-900 text-white">
               {c.name} ({Math.round(carry)}{unit})
             </option>
           );
