@@ -1,17 +1,67 @@
-import { useContext } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { AppContext } from '../App';
-import { BookOpen, Ruler, Briefcase } from 'lucide-react';
+import { BookOpen, Ruler, Briefcase, Download, Smartphone, Share, PlusSquare } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { ModalOverlay } from '../components/Modals';
 
 const Settings = () => {
   const { useYards, toggleUnits } = useContext(AppContext);
   const navigate = useNavigate();
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const [showIOSInstruction, setShowIOSInstruction] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
+
+  useEffect(() => {
+    // Detect iOS
+    const isDeviceIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+    setIsIOS(isDeviceIOS);
+
+    // Capture install prompt for Android/Desktop
+    const handler = (e: any) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstallClick = () => {
+    if (isIOS) {
+      setShowIOSInstruction(true);
+    } else if (installPrompt) {
+      installPrompt.prompt();
+      installPrompt.userChoice.then((choiceResult: any) => {
+        if (choiceResult.outcome === 'accepted') {
+          setInstallPrompt(null);
+        }
+      });
+    } else {
+      // Fallback if app is already installed or browser doesn't support
+      alert("App appears to be installed or your browser handles installation via the address bar.");
+    }
+  };
 
   return (
     <div className="p-4 space-y-6">
       <h1 className="text-2xl font-bold text-white mb-6">Settings</h1>
 
       <div className="space-y-4">
+        {/* Install App Button */}
+        {(installPrompt || isIOS) && (
+             <button
+                onClick={handleInstallClick}
+                className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white rounded-xl p-4 flex items-center gap-3 shadow-lg shadow-blue-900/30 group transition-all"
+             >
+                <div className="bg-white/20 p-2 rounded-lg group-hover:scale-110 transition-transform">
+                   <Download className="text-white" size={20} />
+                </div>
+                <div className="text-left flex-1">
+                   <div className="font-bold text-white">Install App</div>
+                   <div className="text-xs text-blue-100">Download to Home Screen</div>
+                </div>
+             </button>
+        )}
+
         {/* Unit Toggle */}
         <div className="bg-gray-900 rounded-xl p-4 flex items-center justify-between border border-gray-800">
             <div className="flex items-center gap-3">
@@ -62,8 +112,37 @@ const Settings = () => {
       </div>
       
       <div className="text-center text-xs text-gray-600 mt-10">
-          PinSeeker Web v6.0.0
+          PinSeeker Web v6.2.0
       </div>
+
+      {showIOSInstruction && (
+        <ModalOverlay onClose={() => setShowIOSInstruction(false)}>
+           <div className="p-6 text-center">
+             <Smartphone className="mx-auto text-gray-400 mb-4" size={48} />
+             <h3 className="text-lg font-bold text-white mb-4">Install on iOS</h3>
+             <ol className="text-left text-sm text-gray-300 space-y-4 mb-6">
+               <li className="flex items-center gap-3">
+                 <span className="bg-gray-800 w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs">1</span>
+                 <span>Tap the <strong className="text-blue-400">Share</strong> button in Safari's bottom bar. <Share size={14} className="inline ml-1"/></span>
+               </li>
+               <li className="flex items-center gap-3">
+                 <span className="bg-gray-800 w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs">2</span>
+                 <span>Scroll down and select <strong className="text-white">Add to Home Screen</strong>. <PlusSquare size={14} className="inline ml-1"/></span>
+               </li>
+               <li className="flex items-center gap-3">
+                 <span className="bg-gray-800 w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs">3</span>
+                 <span>Tap <strong className="text-blue-400">Add</strong> to finish.</span>
+               </li>
+             </ol>
+             <button 
+               onClick={() => setShowIOSInstruction(false)}
+               className="w-full bg-gray-800 py-3 rounded-xl text-white font-bold"
+             >
+               Got it
+             </button>
+           </div>
+        </ModalOverlay>
+      )}
     </div>
   );
 };

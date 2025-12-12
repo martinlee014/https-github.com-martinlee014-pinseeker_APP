@@ -1,5 +1,26 @@
 # PinSeeker Web - Development Log
 
+## Version: V6.2
+**Date:** 2024-05-25
+**Branch:** `V6.2`
+**Summary:** PWA 支持与安装功能 (PWA Support & App Installation)
+
+### 1. 核心特性 (Key Features)
+- **PWA (Progressive Web App)**:
+  - 添加了 `manifest.json` 和 `sw.js` (Service Worker)，使应用符合可安装标准。
+  - 支持离线缓存基础框架（目前采用 Network-first 策略）。
+  - 支持全屏显示 (`display: standalone`)，移除浏览器地址栏，提供原生 APP 体验。
+- **安装引导 (Install Flow)**:
+  - **Settings 页面**: 新增 "Install App" 按钮。
+  - **Android/Desktop**: 点击按钮直接触发浏览器的安装提示。
+  - **iOS**: 由于系统限制，点击按钮会弹出模态框，图文指导用户使用 Safari 的 "Add to Home Screen" 功能。
+
+### 2. 关键修复 (Critical Fixes)
+- **依赖冲突清理**:
+  - 彻底移除了 `index.html` 中的 `importmap` 脚本。该脚本曾强制引入 React 19，与项目本地的 React 18 依赖产生冲突，导致 `useRef` 等 Hooks 运行时崩溃。现在完全使用 Vite 打包的本地依赖。
+
+---
+
 ## Version: V6.1
 **Date:** 2024-05-24
 **Branch:** `V6.1`
