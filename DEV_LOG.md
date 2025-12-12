@@ -1,5 +1,42 @@
 # PinSeeker Web - Development Log
 
+## Version: V6.4.11
+**Date:** 2024-05-27
+**Branch:** `V6.4`
+**Summary:** Final Deployment & Runtime Fix
+
+### 1. Build Critical Fixes
+- **NPM Config (.npmrc)**: 
+  - **Issue**: Previous file had corrupt encoding causing `Unknown project config` and `ERESOLVE` errors.
+  - **Fix**: Re-generated clean text file with `legacy-peer-deps=true` and `engine-strict=false`. This forces the build server to resolve React 18 dependencies correctly.
+- **Dependency Pinning**: 
+  - **Fix**: Pinned `lucide-react` to `0.344.0` in `package.json` to match the codebase usage.
+- **Cache Reset**: 
+  - **Fix**: Bumped version to `6.4.11` to invalidate build server caches.
+
+### 2. Runtime Critical Fixes
+- **Importmap Removal (index.html)**: 
+  - **Issue**: The `index.html` contained a `<script type="importmap">` block pointing to React 19 (CDN).
+  - **Impact**: This caused the browser to ignore the bundled React 18 code and load React 19 instead, crashing the app with "Multiple React Instances" or "Hooks" errors.
+  - **Fix**: Completely removed the importmap. The app now uses the bundled dependencies exclusively.
+
+---
+
+## Version: V6.4.10
+**Date:** 2024-05-27
+**Branch:** `V6.4`
+**Summary:** Critical Build & Runtime Fix
+
+### 1. Build System Repair
+- **.npmrc Restoration**: 
+  - **Issue**: The `.npmrc` file was corrupted with binary characters, causing `Unknown project config` errors and failing to apply `legacy-peer-deps`.
+  - **Fix**: Re-created `.npmrc` as a clean text file with `legacy-peer-deps=true`. This ensures `npm install` ignores the strict peer dependency conflicts causing the build to fail.
+- **Runtime Environment**: 
+  - **Issue**: `index.html` contained an `importmap` pointing to React 19 on a CDN. This conflicted with the bundled React 18 application, causing a "White Screen of Death" crash.
+  - **Fix**: Removed the `importmap` block entirely. The app now correctly relies on the bundled dependencies.
+
+---
+
 ## Version: V6.4.9
 **Date:** 2024-05-27
 **Branch:** `V6.4`
