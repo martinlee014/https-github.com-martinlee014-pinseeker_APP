@@ -1,5 +1,5 @@
-import { useState, ReactNode } from 'react';
-import { X, Check, AlertTriangle, MapPin, Trophy, Flag } from 'lucide-react';
+import { useState, ReactNode, ChangeEvent } from 'react';
+import { X, Check, AlertTriangle, MapPin, Trophy, Flag, Target } from 'lucide-react';
 import { ClubStats, GolfHole, HoleScore } from '../types';
 
 export const ModalOverlay = ({ children, onClose }: { children?: ReactNode, onClose?: () => void }) => (
@@ -98,16 +98,16 @@ export const ShotConfirmModal = ({
 
   return (
     <ModalOverlay onClose={onCancel}>
-      <div className="p-4 bg-gray-800/50 border-b border-gray-800 shrink-0">
+      <div className="p-4 bg-gray-900 border-b border-gray-800 shrink-0">
         <h3 className="text-lg font-bold text-white flex items-center gap-2">
-          {isGPS ? <MapPin size={18} className="text-blue-400" /> : <MapPin size={18} className="text-purple-400" />}
+          {isGPS ? <MapPin size={18} className="text-blue-500" /> : <Target size={18} className="text-purple-500" />}
           Confirm Shot
         </h3>
       </div>
       
-      <div className="p-6 space-y-4 overflow-y-auto">
+      <div className="p-6 space-y-5 overflow-y-auto bg-gray-900">
         {isLongDistWarning && (
-           <div className="bg-red-900/30 border border-red-800 p-3 rounded-lg flex items-start gap-3">
+           <div className="bg-red-500/10 border border-red-500/20 p-3 rounded-lg flex items-start gap-3">
              <AlertTriangle className="text-red-500 shrink-0" size={20} />
              <div className="text-xs text-red-200">
                <strong>GPS Warning:</strong> Location is >500m from previous shot. GPS accuracy might be low.
@@ -115,44 +115,45 @@ export const ShotConfirmModal = ({
            </div>
         )}
 
-        <div className="text-center py-2">
-          <div className="text-4xl font-black text-white tracking-tight">{dist}</div>
-          <div className="text-gray-500 text-xs uppercase">Distance</div>
+        <div className="text-center py-4 bg-gray-800/50 rounded-2xl border border-gray-700/50">
+          <div className="text-5xl font-black text-white tracking-tight">{dist}</div>
+          <div className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-1">Total Distance</div>
         </div>
 
         <div>
-          <label className="text-xs text-gray-400 font-bold mb-1 block">Club Used</label>
-          <div className="relative">
+          <label className="text-xs text-gray-400 font-bold mb-2 block uppercase tracking-wider">Club Used</label>
+          <div className="relative group">
             <select 
-              className="w-full bg-gray-800 text-white p-3 rounded-lg outline-none border border-gray-700 appearance-none font-bold"
+              className="w-full bg-gray-800 text-white p-4 pr-10 rounded-xl outline-none border border-gray-700 appearance-none font-bold text-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all cursor-pointer"
               value={club.name}
-              onChange={(e) => {
-                const c = clubs.find(cl => cl.name === e.target.value);
+              onChange={(e: ChangeEvent<HTMLSelectElement>) => {
+                const selectedName = e.target.value;
+                const c = (clubs || []).find(cl => cl.name === selectedName);
                 if (c) onChangeClub(c);
               }}
             >
-              {clubs.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
+              {(clubs || []).map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
             </select>
-            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
-              <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-400 group-hover:text-white transition-colors">
+              <svg className="fill-current h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
             </div>
           </div>
         </div>
 
-        <div className="flex gap-3 mt-4">
+        <div className="flex gap-3 pt-2">
           <button 
             type="button" 
             onClick={(e) => { e.preventDefault(); onCancel(); }} 
-            className="flex-1 bg-gray-800 text-gray-300 py-3 rounded-xl font-bold cursor-pointer hover:bg-gray-700 active:scale-95 transition-transform"
+            className="flex-1 bg-gray-800 text-gray-300 py-3.5 rounded-xl font-bold cursor-pointer hover:bg-gray-700 active:scale-95 transition-all border border-gray-700"
           >
             Cancel
           </button>
           <button 
             type="button" 
             onClick={(e) => { e.preventDefault(); onConfirm(); }} 
-            className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold cursor-pointer hover:bg-blue-500 active:scale-95 transition-transform shadow-lg shadow-blue-900/30"
+            className="flex-1 bg-gradient-to-r from-blue-600 to-blue-500 text-white py-3.5 rounded-xl font-bold cursor-pointer hover:from-blue-500 hover:to-blue-400 active:scale-95 transition-all shadow-lg shadow-blue-900/30"
           >
-            Confirm
+            Confirm Shot
           </button>
         </div>
       </div>

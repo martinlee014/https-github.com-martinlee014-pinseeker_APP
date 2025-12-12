@@ -1,5 +1,24 @@
 # PinSeeker Web - Development Log
 
+## Version: V6.4
+**Date:** 2024-05-27
+**Branch:** `V6.4`
+**Summary:** Refactoring & Error Handling Fixes (UI Polish & Bug Fixes)
+
+### 1. 修复与优化 (Fixes & Improvements)
+- **Modals.tsx Error Fix**:
+  - **问题**: `ShotConfirmModal` 中 `clubs.find` 可能在极端情况下遭遇 `clubs` 未定义的问题，导致运行时崩溃 (Reported error at line 113).
+  - **修复**: 增加了更严格的空值检查 `(clubs || []).find(...)` 并明确了 `onChange` 事件类型。
+- **Index.html Cleanup**:
+  - **问题**: `index.html` 中残留的 `importmap` 再次被清理。此代码块之前导致了 React 版本冲突。
+- **UI Refactor**:
+  - **Shot Confirm Modal**: 重新设计了击球确认弹窗。
+    - 使用了更一致的 Glassmorphism 风格。
+    - 增大了字体和触控区域，更适合户外操作。
+    - 优化了下拉菜单的样式，添加了自定义箭头图标。
+
+---
+
 ## Version: V6.3
 **Date:** 2024-05-26
 **Branch:** `V6.3`
