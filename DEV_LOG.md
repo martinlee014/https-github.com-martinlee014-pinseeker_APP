@@ -1,5 +1,20 @@
 # PinSeeker Web - Development Log
 
+## Version: V6.4.7
+**Date:** 2024-05-27
+**Branch:** `V6.4`
+**Summary:** Build Config & Encoding Fix
+
+### 1. Build Critical Repairs
+- **.npmrc Encoding Fix**: 
+  - **Issue**: The previous `.npmrc` was causing `Unknown project config` errors, likely due to encoding corruption.
+  - **Fix**: Re-created the file with standard text encoding containing `legacy-peer-deps=true`.
+- **Dependency Clean**: 
+  - **Fix**: Removed `importmap` from `index.html` to stop runtime crashes caused by React 19 CDN loading.
+  - **Fix**: Bumped version in `package.json` to `6.4.7`.
+
+---
+
 ## Version: V6.4.6
 **Date:** 2024-05-27
 **Branch:** `V6.4`
