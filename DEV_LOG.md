@@ -1,5 +1,35 @@
 # PinSeeker Web - Development Log
 
+## Version: V6.4.6
+**Date:** 2024-05-27
+**Branch:** `V6.4`
+**Summary:** Final Dependency Lock
+
+### 1. Build Stabilization
+- **Pinned Dependencies**: 
+  - **Fix**: Removed caret `^` from `lucide-react` in `package.json` (set to exact `0.344.0`). This prevents the build server from resolving conflicting newer versions.
+- **NPM Config**: 
+  - **Fix**: Added `.npmrc` with `legacy-peer-deps=true`. This is the definitive fix for "ERESOLVE" errors on Vercel/GitHub Actions when using React 18 with certain UI libraries.
+- **HTML Cleanup**: 
+  - **Fix**: Removed `importmap` from `index.html`. This ensures the app uses the bundled React 18 code instead of trying to fetch React 19 from a CDN, which was causing runtime crashes.
+
+---
+
+## Version: V6.4.5
+**Date:** 2024-05-27
+**Branch:** `V6.4`
+**Summary:** Config File Repair
+
+### 1. Build Critical Repair
+- **.npmrc Repair**: 
+  - **Issue**: The previous `.npmrc` file contained corrupted/binary characters causing `npm warn Unknown project config` and subsequent install failures.
+  - **Fix**: Re-wrote `.npmrc` with clean text `legacy-peer-deps=true`.
+- **Importmap Removal**: 
+  - **Issue**: `index.html` still contained the `importmap` pointing to React 19.
+  - **Fix**: Removed the `importmap` block entirely to ensure the app uses the defined `package.json` dependencies (React 18).
+
+---
+
 ## Version: V6.4.4
 **Date:** 2024-05-27
 **Branch:** `V6.4`
