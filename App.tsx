@@ -40,10 +40,11 @@ const MainLayout = ({ children }: { children?: ReactNode }) => {
   const isPlayMode = location.pathname.startsWith('/play');
 
   return (
-    <div className="flex flex-col h-screen max-w-md mx-auto bg-black relative shadow-2xl overflow-hidden">
+    // Changed h-screen to h-[100dvh] to handle mobile browser bars correctly
+    <div className="flex flex-col h-[100dvh] max-w-md mx-auto bg-black relative shadow-2xl overflow-hidden">
       {/* Header */}
       {!isPlayMode && (
-        <header className="flex items-center justify-between p-4 bg-gray-900 border-b border-gray-800 z-10">
+        <header className="flex items-center justify-between p-4 bg-gray-900 border-b border-gray-800 z-10 shrink-0">
           <div className="flex items-center gap-2" onClick={() => navigate('/dashboard')}>
             <MapIcon className="text-green-500" />
             <span className="font-bold text-xl tracking-wider">PINSEEKER</span>
@@ -61,7 +62,7 @@ const MainLayout = ({ children }: { children?: ReactNode }) => {
 
       {/* Bottom Nav - Hide in Play Mode */}
       {!isPlayMode && (
-        <nav className="flex justify-around items-center p-3 bg-gray-900 border-t border-gray-800 z-10">
+        <nav className="flex justify-around items-center p-3 bg-gray-900 border-t border-gray-800 z-10 shrink-0 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
           <NavItem icon={<User size={24} />} label="Dash" path="/dashboard" active={location.pathname === '/dashboard'} />
           <div className="relative -top-5">
              <button 

@@ -279,7 +279,8 @@ const ClubManagement = () => {
 
       <button 
         onClick={() => openEditor({ name: 'New Club', carry: 150, sideError: 15, depthError: 10 }, true)}
-        className="fixed bottom-6 right-6 bg-green-600 text-white p-4 rounded-full shadow-xl shadow-green-900/50 hover:scale-105 transition-transform"
+        className="fixed right-6 bg-green-600 text-white p-4 rounded-full shadow-xl shadow-green-900/50 hover:scale-105 transition-transform"
+        style={{ bottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}
       >
         <Plus size={24} />
       </button>
