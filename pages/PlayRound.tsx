@@ -188,6 +188,7 @@ const RotatedMapHandler = ({
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startClientPos = useRef<{x: number, y: number} | null>(null);
   const hasMovedSignificantly = useRef(false);
+  const isMultiTouch = useRef(false);
 
   useEffect(() => {
     const container = map.getContainer();
@@ -239,13 +240,16 @@ const RotatedMapHandler = ({
       if ((e as MouseEvent).button === 2) return; 
 
       if (window.TouchEvent && e instanceof TouchEvent && e.touches.length > 1) {
+          isMultiTouch.current = true;
           if (longPressTimer.current) clearTimeout(longPressTimer.current);
           isDragging.current = false;
+          startClientPos.current = null; // Invalidate any potential click
           return;
       }
 
       isDragging.current = true;
       hasMovedSignificantly.current = false;
+      isMultiTouch.current = false;
       const pos = getClientPos(e);
       lastPos.current = pos;
       startClientPos.current = pos;
@@ -257,7 +261,7 @@ const RotatedMapHandler = ({
       if (!isInteractive) {
           longPressTimer.current = setTimeout(() => {
               isDragging.current = false;
-              if (!hasMovedSignificantly.current) {
+              if (!hasMovedSignificantly.current && !isMultiTouch.current) {
                   handleLongPress(pos);
                   startClientPos.current = null; // Consume event
               }
@@ -267,8 +271,10 @@ const RotatedMapHandler = ({
 
     const handleMove = (e: MouseEvent | TouchEvent) => {
       if (window.TouchEvent && e instanceof TouchEvent && e.touches.length > 1) {
+          isMultiTouch.current = true;
           if (longPressTimer.current) clearTimeout(longPressTimer.current);
           isDragging.current = false;
+          startClientPos.current = null; // Invalidate potential click
           return;
       }
 
@@ -303,6 +309,14 @@ const RotatedMapHandler = ({
       if (longPressTimer.current) {
           clearTimeout(longPressTimer.current);
           longPressTimer.current = null;
+      }
+
+      // If multitouch occurred at any point, do not trigger click
+      if (isMultiTouch.current) {
+          isDragging.current = false;
+          lastPos.current = null;
+          startClientPos.current = null;
+          return;
       }
 
       if (startClientPos.current && !hasMovedSignificantly.current) {
@@ -797,6 +811,18 @@ const PlayRound = () => {
     }, (err) => alert("GPS Error: " + err.message));
   };
 
+  const handleMeasureGPS = () => {
+      if (!navigator.geolocation) {
+          alert("Geolocation not supported");
+          return;
+      }
+      navigator.geolocation.getCurrentPosition((pos) => {
+          const gpsPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          setCurrentBallPos(gpsPos);
+          if (navigator.vibrate) navigator.vibrate(50);
+      }, (err) => alert("GPS Error: " + err.message));
+  };
+
   const handleGPSButtonStart = (e: React.MouseEvent | React.TouchEvent) => {
     if(e.cancelable) e.preventDefault();
     isLongPressAction.current = false;
@@ -1244,15 +1270,24 @@ const PlayRound = () => {
         <>
             <div className="absolute bottom-0 w-full z-30 pt-2 px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] bg-gradient-to-t from-black/95 via-black/80 to-transparent">
                 {isMeasureMode ? (
-                    <div className="bg-gray-900 rounded-2xl border border-blue-500/40 shadow-xl p-6 flex items-center justify-between mb-2">
-                        <div className="flex-1 text-center border-r border-gray-700">
-                            <div className="text-[10px] text-blue-200 uppercase font-bold tracking-widest mb-1 opacity-80">Distance</div>
-                            <div className="text-3xl font-black text-blue-400 leading-none">{MathUtils.formatDistance(measureDist1, useYards)}</div>
+                    <div className="flex gap-3 h-20 items-stretch mb-2">
+                        <div className="flex-1 bg-gray-900 rounded-2xl border border-blue-500/40 shadow-xl flex items-center justify-between px-4">
+                            <div className="flex-1 text-center border-r border-gray-700 py-2">
+                                <div className="text-[10px] text-blue-200 uppercase font-bold tracking-widest mb-1 opacity-80">From You</div>
+                                <div className="text-3xl font-black text-blue-400 leading-none">{MathUtils.formatDistance(measureDist1, useYards)}</div>
+                            </div>
+                             <div className="flex-1 text-center py-2">
+                                <div className="text-[10px] text-gray-400 uppercase font-bold tracking-widest mb-1 opacity-80">To Pin</div>
+                                <div className="text-3xl font-black text-white leading-none">{MathUtils.formatDistance(measureDist2, useYards)}</div>
+                            </div>
                         </div>
-                         <div className="flex-1 text-center">
-                            <div className="text-[10px] text-gray-400 uppercase font-bold tracking-widest mb-1 opacity-80">Remaining</div>
-                            <div className="text-3xl font-black text-white leading-none">{MathUtils.formatDistance(measureDist2, useYards)}</div>
-                        </div>
+                        <button 
+                            onClick={handleMeasureGPS}
+                            className="w-20 flex-none bg-blue-600 active:bg-blue-500 text-white rounded-2xl flex flex-col items-center justify-center shadow-lg shadow-blue-900/20 border border-white/5 transition-all select-none"
+                        >
+                            <MapPin size={24} className="mb-1" />
+                            <span className="text-[9px] font-bold uppercase">My Loc</span>
+                        </button>
                     </div>
                 ) : (
                     <>
