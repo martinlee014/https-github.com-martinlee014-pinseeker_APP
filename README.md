@@ -10,26 +10,30 @@
 - **Replay Mode**: Review past rounds shot-by-shot.
 - **Scorecard**: Track strokes, putts, and penalties.
 
-## 📱 Important: Mobile & GPS Support
+## 📱 Mobile & GPS Support (HTTPS Required)
 
 **Crucial**: To use the GPS Location features (`navigator.geolocation`) on a mobile device (iOS/Android), this application **must be served over HTTPS**.
 
-Mobile browsers block GPS access on insecure (HTTP) connections (except for `localhost` on the device itself).
+## 🌐 Deployment & Anonymity Guide
 
-### Recommended Deployment (Free & Automatic HTTPS)
+To share this app with friends **without exposing your GitHub username** (e.g., avoiding URLs like `username.github.io`), use Vercel.
 
-#### Option 1: Vercel (Easiest)
-1. Push this code to GitHub.
-2. Import the repository on [Vercel](https://vercel.com).
-3. Vercel automatically detects the build settings. Click **Deploy**.
-4. Use the provided `https://...vercel.app` link on your phone.
+### Step 1: Deploy to Vercel
+1. Push your code to your GitHub repository.
+2. Go to [Vercel.com](https://vercel.com) and sign up/login.
+3. Click **"Add New..."** -> **"Project"**.
+4. Import your `pinseeker-web` repository.
+5. Click **Deploy**.
 
-#### Option 2: GitHub Pages
-1. Ensure `react-router-dom` is using `HashRouter` (Already configured in `App.tsx`).
-2. Add `"homepage": "https://<username>.github.io/pinseeker_web"` to `package.json`.
-3. Run `npm install gh-pages --save-dev`.
-4. Add `"deploy": "gh-pages -d dist"` to scripts in `package.json`.
-5. Run `npm run deploy`.
+### Step 2: Anonymize the URL (Important)
+By default, Vercel might generate a URL based on your GitHub project name. To make it completely neutral:
+
+1. Go to your Project Dashboard on Vercel.
+2. Click **Settings** (top navigation bar).
+3. Click **Domains** (left sidebar).
+4. Find your current domain (e.g., `pinseeker-web.vercel.app`).
+5. Click **Edit** and change it to a generic name (e.g., `golf-app-demo-v1.vercel.app`).
+6. Share this new URL with your friends. It contains no link to your GitHub profile.
 
 ## 🛠 Local Development
 
