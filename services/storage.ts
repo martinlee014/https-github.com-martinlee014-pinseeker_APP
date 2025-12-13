@@ -1,11 +1,12 @@
 
-import { RoundHistory, ClubStats, GolfCourse } from "../types";
+import { RoundHistory, ClubStats, GolfCourse, MapAnnotation } from "../types";
 import { DEFAULT_BAG, DUVENHOF_COURSE } from "../constants";
 
 const KEY_USER = 'pinseeker_current_user';
 const KEY_SETTINGS_UNIT = 'pinseeker_unit_system';
 const KEY_CLUB_BAG = 'pinseeker_club_bag';
 const KEY_CUSTOM_COURSES = 'pinseeker_custom_courses';
+const KEY_ANNOTATIONS = 'pinseeker_map_annotations';
 
 export const StorageService = {
   getCurrentUser: (): string | null => {
@@ -77,6 +78,29 @@ export const StorageService = {
     const courses = StorageService.getCustomCourses();
     const newCourses = courses.filter(c => c.id !== courseId);
     localStorage.setItem(KEY_CUSTOM_COURSES, JSON.stringify(newCourses));
+  },
+  
+  // --- Map Annotations ---
+  getAnnotations: (courseId: string, holeNumber: number): MapAnnotation[] => {
+    const data = localStorage.getItem(KEY_ANNOTATIONS);
+    if (!data) return [];
+    const all: MapAnnotation[] = JSON.parse(data);
+    return all.filter(a => a.courseId === courseId && a.holeNumber === holeNumber);
+  },
+
+  saveAnnotation: (note: MapAnnotation) => {
+    const data = localStorage.getItem(KEY_ANNOTATIONS);
+    const all: MapAnnotation[] = data ? JSON.parse(data) : [];
+    all.push(note);
+    localStorage.setItem(KEY_ANNOTATIONS, JSON.stringify(all));
+  },
+
+  deleteAnnotation: (noteId: string) => {
+    const data = localStorage.getItem(KEY_ANNOTATIONS);
+    if (!data) return;
+    const all: MapAnnotation[] = JSON.parse(data);
+    const filtered = all.filter(a => a.id !== noteId);
+    localStorage.setItem(KEY_ANNOTATIONS, JSON.stringify(filtered));
   },
   // -----------------------
 

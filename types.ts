@@ -63,6 +63,16 @@ export interface RoundHistory {
   shots: ShotRecord[];
 }
 
+export interface MapAnnotation {
+  id: string;
+  courseId: string;
+  holeNumber: number;
+  type: 'text' | 'icon' | 'path';
+  subType?: 'flag' | 'hazard' | 'rough'; // For icons or specific path styles
+  points: LatLng[]; // index 0 used for text/icon position
+  text?: string;
+}
+
 export interface GameState {
   currentHoleIndex: number;
   currentShotNum: number;

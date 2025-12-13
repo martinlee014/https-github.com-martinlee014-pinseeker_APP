@@ -1,16 +1,15 @@
-
 import React, { useState, useEffect, useContext, useMemo, useRef, Fragment } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { MapContainer, TileLayer, Marker, Polyline, Polygon, useMap, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Polyline, Polygon, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { AppContext } from '../App';
 import { DUVENHOF_COURSE } from '../constants';
 import { StorageService } from '../services/storage';
 import * as MathUtils from '../services/mathUtils';
-import { ClubStats, HoleScore, ShotRecord, RoundHistory, LatLng, GolfCourse } from '../types';
+import { ClubStats, HoleScore, ShotRecord, RoundHistory, LatLng, GolfCourse, MapAnnotation } from '../types';
 import ClubSelector from '../components/ClubSelector';
 import { ScoreModal, ShotConfirmModal, HoleSelectorModal, FullScorecardModal, ModalOverlay } from '../components/Modals';
-import { Flag, Wind, ChevronLeft, Grid, ListChecks, ArrowLeft, ArrowRight, ChevronDown, MapPin, Ruler, Trash2 } from 'lucide-react';
+import { Flag, Wind, ChevronLeft, Grid, ListChecks, ArrowLeft, ArrowRight, ChevronDown, MapPin, Ruler, Trash2, PenTool, Type, Highlighter, X, Check, Eraser } from 'lucide-react';
 
 // --- Icons Setup ---
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -27,6 +26,16 @@ const flagIcon = new L.Icon({
   iconAnchor: [12, 41],
   popupAnchor: [1, -34],
   shadowSize: [41, 41]
+});
+
+// For user added Flag annotation
+const userFlagIcon = new L.Icon({
+    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-gold.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41]
 });
 
 const targetIcon = new L.DivIcon({
@@ -131,6 +140,36 @@ const createDistanceLabelIcon = (text: string, rotation: number, color: string =
   iconAnchor: [20, 15] 
 });
 
+const createAnnotationTextIcon = (text: string, rotation: number) => new L.DivIcon({
+  className: 'custom-annotation-icon',
+  html: `
+    <div style='
+      transform: rotate(${rotation}deg); 
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    '>
+       <div style="
+         background-color: rgba(0,0,0,0.8); 
+         color: #facc15; 
+         padding: 4px 8px; 
+         border-radius: 6px; 
+         font-size: 12px; 
+         font-weight: bold; 
+         white-space: nowrap;
+         border: 1px solid rgba(250, 204, 21, 0.4);
+         box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+       ">
+        ${text}
+       </div>
+       <div style="width: 2px; height: 10px; background-color: rgba(250,204,21,0.5);"></div>
+       <div style="width: 6px; height: 6px; background-color: #facc15; border-radius: 50%;"></div>
+    </div>
+  `,
+  iconSize: [0, 0],
+  iconAnchor: [0, 24] // Anchor at the bottom dot
+});
+
 // RotatedMapHandler: Handles Pan, Click, and Long Press with CSS Transform correction
 const RotatedMapHandler = ({ 
     rotation, 
@@ -176,10 +215,6 @@ const RotatedMapHandler = ({
         const unscaledDy = dy / scale;
 
         // Undo Rotation
-        // CSS rotates clockwise by 'rotation'. To undo, rotate counter-clockwise by 'rotation'.
-        // Or rotate by -rotation.
-        // angleRad needs to align with standard trig circle (CCW is positive).
-        // If rotation is 90 (clockwise), we want to rotate -90 (CCW).
         const angleRad = (-rotation * Math.PI) / 180;
         
         const rotatedX = unscaledDx * Math.cos(angleRad) - unscaledDy * Math.sin(angleRad);
@@ -215,16 +250,19 @@ const RotatedMapHandler = ({
       lastPos.current = pos;
       startClientPos.current = pos;
 
-      longPressTimer.current = setTimeout(() => {
-          isDragging.current = false;
-          if (!hasMovedSignificantly.current) {
-              handleLongPress(pos);
-              startClientPos.current = null; // Consume event
-          }
-      }, 600);
+      // Only start Long Press timer if NOT on an interactive element (Marker, Polyline)
+      const target = e.target as HTMLElement;
+      const isInteractive = target.closest('.leaflet-interactive') || target.closest('.leaflet-popup-pane');
       
-      // Stop propagation to prevent Leaflet from double-handling or handling incorrectly due to CSS transform
-      // But allow default for some touch actions if needed, though we handle pan manually.
+      if (!isInteractive) {
+          longPressTimer.current = setTimeout(() => {
+              isDragging.current = false;
+              if (!hasMovedSignificantly.current) {
+                  handleLongPress(pos);
+                  startClientPos.current = null; // Consume event
+              }
+          }, 600);
+      }
     };
 
     const handleMove = (e: MouseEvent | TouchEvent) => {
@@ -241,7 +279,7 @@ const RotatedMapHandler = ({
               Math.pow(currentPos.x - startClientPos.current.x, 2) + 
               Math.pow(currentPos.y - startClientPos.current.y, 2)
           );
-          if (moveDist > 5) {
+          if (moveDist > 10) { 
               hasMovedSignificantly.current = true;
               if (longPressTimer.current) clearTimeout(longPressTimer.current);
           }
@@ -268,13 +306,37 @@ const RotatedMapHandler = ({
       }
 
       if (startClientPos.current && !hasMovedSignificantly.current) {
-         const latlng = calculateLatLng(startClientPos.current);
-         onClick({ lat: latlng.lat, lng: latlng.lng });
+         // If we clicked on an interactive element, we skipped the long press timer logic.
+         // But we might still want to trigger click if it wasn't interactive.
+         const target = e.target as HTMLElement;
+         const isInteractive = target.closest('.leaflet-interactive') || target.closest('.leaflet-popup-pane');
+         
+         if (!isInteractive) {
+             const latlng = calculateLatLng(startClientPos.current);
+             onClick({ lat: latlng.lat, lng: latlng.lng });
+         }
       }
 
       isDragging.current = false;
       lastPos.current = null;
       startClientPos.current = null;
+    };
+
+    const handleContextMenu = (e: MouseEvent) => {
+        e.preventDefault(); // Always block native context menu
+
+        // Filter out contextmenu events that originate from touch interactions 
+        // (like 2-finger taps or browser-simulated long presses).
+        // We handle Touch Long Press via the timer in handleStart/handleMove.
+        // This prevents double-firing and avoids the "Zoom triggers Text Box" bug.
+        const isTouch = (e as any).pointerType === 'touch' || (e as any).sourceCapabilities?.firesTouchEvents;
+        
+        if (!isTouch) {
+             // Handle actual Mouse Right-Clicks using our rotation-corrected logic
+             const pos = getClientPos(e);
+             const latlng = calculateLatLng(pos);
+             onLongPress({ lat: latlng.lat, lng: latlng.lng });
+        }
     };
 
     container.addEventListener('mousedown', handleStart);
@@ -283,6 +345,7 @@ const RotatedMapHandler = ({
     window.addEventListener('touchmove', handleMove, { passive: false });
     window.addEventListener('mouseup', handleEnd);
     window.addEventListener('touchend', handleEnd);
+    container.addEventListener('contextmenu', handleContextMenu);
 
     return () => {
       container.removeEventListener('mousedown', handleStart);
@@ -291,6 +354,7 @@ const RotatedMapHandler = ({
       window.removeEventListener('touchmove', handleMove);
       window.removeEventListener('mouseup', handleEnd);
       window.removeEventListener('touchend', handleEnd);
+      container.removeEventListener('contextmenu', handleContextMenu);
     };
   }, [map, rotation, onLongPress, onClick]);
 
@@ -299,6 +363,15 @@ const RotatedMapHandler = ({
 
 const MapInitializer = ({ center, isReplay, pointsToFit }: { center: LatLng, isReplay: boolean, pointsToFit?: LatLng[] }) => {
     const map = useMap();
+    
+    // Fix: Force Leaflet to recalculate container size after mount to prevent partial tile loading
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            map.invalidateSize();
+        }, 250);
+        return () => clearTimeout(timer);
+    }, [map]);
+
     useEffect(() => {
         if (isReplay && pointsToFit && pointsToFit.length > 0) {
             let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180;
@@ -317,13 +390,8 @@ const MapInitializer = ({ center, isReplay, pointsToFit }: { center: LatLng, isR
     return null;
 }
 
-// Only used for context menu (Right click) on desktop now
-const MapEvents = ({ onMapLongPress }: any) => {
-  useMapEvents({
-    contextmenu: (e) => onMapLongPress(e.latlng)
-  });
-  return null;
-};
+// --- ANNOTATION TOOLBAR COMPONENT ---
+type AnnotationTool = 'text' | 'pin' | 'draw' | 'eraser';
 
 const PlayRound = () => {
   const navigate = useNavigate();
@@ -361,12 +429,24 @@ const PlayRound = () => {
   const [isMeasureMode, setIsMeasureMode] = useState(false);
   const [measureTarget, setMeasureTarget] = useState<LatLng | null>(null);
   
+  // --- Note/Annotation Mode State ---
+  const [isNoteMode, setIsNoteMode] = useState(false);
+  const [annotations, setAnnotations] = useState<MapAnnotation[]>([]);
+  const [activeTool, setActiveTool] = useState<AnnotationTool>('text');
+  const [drawingPoints, setDrawingPoints] = useState<LatLng[]>([]);
+  const [showTextInput, setShowTextInput] = useState<{lat: number, lng: number} | null>(null);
+  const [textInputValue, setTextInputValue] = useState("");
+  
   // --- Deletion State ---
   const [shotToDelete, setShotToDelete] = useState<ShotRecord | null>(null);
 
   // GPS Button Logic Refs
   const gpsPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isLongPressAction = useRef(false);
+
+  // Annotation Long Press Logic
+  const annotationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const annotationStartPos = useRef<{x: number, y: number} | null>(null);
 
   const hole = activeCourse.holes[currentHoleIdx];
 
@@ -414,6 +494,14 @@ const PlayRound = () => {
               setCurrentBallPos(hole.tee);
           }
       }
+  }, [currentHoleIdx, activeCourse]);
+
+  // Load annotations when hole changes
+  useEffect(() => {
+    if (hole && activeCourse) {
+        const notes = StorageService.getAnnotations(activeCourse.id, hole.number);
+        setAnnotations(notes);
+    }
   }, [currentHoleIdx, activeCourse]);
 
   useEffect(() => {
@@ -509,6 +597,24 @@ const PlayRound = () => {
 
   const handleMapClick = (latlng: any) => {
     if (isReplay) return;
+
+    if (isNoteMode) {
+        if (activeTool === 'pin') {
+            const newNote: MapAnnotation = {
+                id: crypto.randomUUID(),
+                courseId: activeCourse.id,
+                holeNumber: hole.number,
+                type: 'icon',
+                subType: 'flag',
+                points: [{lat: latlng.lat, lng: latlng.lng}],
+            };
+            StorageService.saveAnnotation(newNote);
+            setAnnotations(prev => [...prev, newNote]);
+        } else if (activeTool === 'draw') {
+            setDrawingPoints(prev => [...prev, {lat: latlng.lat, lng: latlng.lng}]);
+        }
+        return;
+    }
     
     if (isMeasureMode) {
         setMeasureTarget({ lat: latlng.lat, lng: latlng.lng });
@@ -523,8 +629,144 @@ const PlayRound = () => {
     setAimAngle(diff);
   };
 
+  const handleSaveTextNote = () => {
+      if (!showTextInput || !textInputValue.trim()) {
+          setShowTextInput(null);
+          return;
+      }
+      const newNote: MapAnnotation = {
+          id: crypto.randomUUID(),
+          courseId: activeCourse.id,
+          holeNumber: hole.number,
+          type: 'text',
+          points: [{lat: showTextInput.lat, lng: showTextInput.lng}],
+          text: textInputValue.trim()
+      };
+      StorageService.saveAnnotation(newNote);
+      setAnnotations(prev => [...prev, newNote]);
+      setShowTextInput(null);
+      setTextInputValue("");
+  };
+
+  const handleFinishDrawing = () => {
+      if (drawingPoints.length < 2) {
+          setDrawingPoints([]);
+          return;
+      }
+      const newNote: MapAnnotation = {
+          id: crypto.randomUUID(),
+          courseId: activeCourse.id,
+          holeNumber: hole.number,
+          type: 'path',
+          subType: 'rough',
+          points: drawingPoints
+      };
+      StorageService.saveAnnotation(newNote);
+      setAnnotations(prev => [...prev, newNote]);
+      setDrawingPoints([]);
+  };
+
+  const deleteAnnotation = (id: string) => {
+     if (confirm("Delete this annotation?")) {
+        StorageService.deleteAnnotation(id);
+        setAnnotations(prev => prev.filter(a => a.id !== id));
+     }
+  };
+
+  // --- Helper to create robust long-press handlers for annotations ---
+  const createAnnotationHandlers = (id: string) => {
+      if (!isNoteMode) return {};
+
+      // Common helper to get coordinates from any event type
+      const getEventPos = (evt: any) => {
+          if (evt.touches && evt.touches.length > 0) {
+              return { x: evt.touches[0].clientX, y: evt.touches[0].clientY };
+          }
+          return { x: evt.clientX, y: evt.clientY };
+      };
+
+      const handleClick = (e: L.LeafletMouseEvent | L.LeafletEvent) => {
+          const evt = (e as any).originalEvent;
+          if (evt) L.DomEvent.stopPropagation(evt);
+          
+          if (activeTool === 'eraser') {
+              deleteAnnotation(id);
+          }
+      };
+
+      const handleStart = (e: L.LeafletMouseEvent | L.LeafletEvent) => {
+          const originalEvent = (e as any).originalEvent;
+          if (originalEvent) {
+             L.DomEvent.stopPropagation(originalEvent);
+          }
+          
+          // If we are in eraser mode, we handle delete on CLICK/TAP, not long press.
+          if (activeTool === 'eraser') return;
+
+          if (annotationTimer.current) clearTimeout(annotationTimer.current);
+
+          const pos = getEventPos(originalEvent);
+          annotationStartPos.current = pos;
+
+          annotationTimer.current = setTimeout(() => {
+              if (navigator.vibrate) navigator.vibrate(50);
+              deleteAnnotation(id);
+              annotationTimer.current = null;
+          }, 800);
+      };
+
+      const handleMove = (e: L.LeafletMouseEvent | L.LeafletEvent) => {
+          if (!annotationTimer.current || !annotationStartPos.current) return;
+          
+          const evt = (e as any).originalEvent;
+          if (!evt) return;
+
+          const pos = getEventPos(evt);
+          const dist = Math.sqrt(
+              Math.pow(pos.x - annotationStartPos.current.x, 2) + 
+              Math.pow(pos.y - annotationStartPos.current.y, 2)
+          );
+
+          if (dist > 10) {
+              clearTimeout(annotationTimer.current);
+              annotationTimer.current = null;
+          }
+      };
+
+      const handleEnd = () => {
+          if (annotationTimer.current) {
+              clearTimeout(annotationTimer.current);
+              annotationTimer.current = null;
+          }
+      };
+
+      return {
+          click: handleClick,
+          mousedown: handleStart,
+          touchstart: handleStart,
+          mousemove: handleMove,
+          touchmove: handleMove,
+          mouseup: handleEnd,
+          touchend: handleEnd,
+          contextmenu: (e: any) => {
+              L.DomEvent.stopPropagation(e.originalEvent);
+              L.DomEvent.preventDefault(e.originalEvent);
+              deleteAnnotation(id);
+          }
+      };
+  };
+
   const handleManualDrop = (latlng: any) => {
     if (isReplay || isMeasureMode) return;
+    
+    if (isNoteMode) {
+        if (activeTool === 'text') {
+            setShowTextInput({lat: latlng.lat, lng: latlng.lng});
+            setTextInputValue("");
+        }
+        return;
+    }
+
     const pos = { lat: latlng.lat, lng: latlng.lng };
     const dist = MathUtils.calculateDistance(currentBallPos, pos);
     setPendingShot({ pos, isGPS: false, dist });
@@ -650,6 +892,7 @@ const PlayRound = () => {
     setAimAngle(0);
     setMeasureTarget(null);
     setIsMeasureMode(false);
+    setIsNoteMode(false);
     setShowHoleSelect(false);
   };
 
@@ -670,10 +913,20 @@ const PlayRound = () => {
   const toggleMeasureMode = () => {
       const newState = !isMeasureMode;
       setIsMeasureMode(newState);
+      setIsNoteMode(false);
       if (newState) {
           setAimAngle(0);
           setMeasureTarget(predictedLanding); 
       }
+  };
+
+  const toggleNoteMode = () => {
+      const newState = !isNoteMode;
+      setIsNoteMode(newState);
+      setIsMeasureMode(false);
+      setActiveTool('text'); // Default tool
+      setDrawingPoints([]);
+      setShowTextInput(null);
   };
 
   const handleWindCircleInteract = (e: React.MouseEvent | React.TouchEvent) => {
@@ -712,9 +965,56 @@ const PlayRound = () => {
               <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" />
               <RotatedMapHandler rotation={mapRotation} onLongPress={handleManualDrop} onClick={handleMapClick} />
               <MapInitializer center={currentBallPos} isReplay={isReplay} pointsToFit={replayPoints} />
-              <MapEvents onMapLongPress={handleManualDrop} />
               <Marker position={[hole.green.lat, hole.green.lng]} icon={flagIcon} />
               
+              {/* User Annotations */}
+              {annotations.map(note => {
+                 const handlers = createAnnotationHandlers(note.id);
+                 if (note.type === 'path' && note.points.length > 1) {
+                     return (
+                        <Polyline 
+                            key={note.id}
+                            positions={note.points.map(p => [p.lat, p.lng])}
+                            pathOptions={{ color: '#facc15', weight: 3, dashArray: '5,5', opacity: 0.8 }}
+                            eventHandlers={handlers}
+                            interactive={true}
+                        />
+                     );
+                 } else if (note.type === 'text' && note.points.length > 0 && note.text) {
+                     return (
+                        <Marker 
+                            key={note.id}
+                            position={[note.points[0].lat, note.points[0].lng]}
+                            icon={createAnnotationTextIcon(note.text, -mapRotation)}
+                            eventHandlers={handlers}
+                            interactive={true}
+                        />
+                     );
+                 } else if (note.type === 'icon' && note.points.length > 0) {
+                     return (
+                        <Marker 
+                            key={note.id}
+                            position={[note.points[0].lat, note.points[0].lng]}
+                            icon={userFlagIcon}
+                            eventHandlers={handlers}
+                            interactive={true}
+                        />
+                     );
+                 }
+                 return null;
+              })}
+
+              {/* Active Drawing Line */}
+              {isNoteMode && drawingPoints.length > 0 && (
+                  <>
+                      {drawingPoints.map((p, i) => (
+                          <Marker key={i} position={[p.lat, p.lng]} icon={measureTargetIcon} />
+                      ))}
+                      <Polyline positions={drawingPoints.map(p => [p.lat, p.lng])} pathOptions={{ color: '#facc15', weight: 2, dashArray: '2,4' }} />
+                  </>
+              )}
+
+
               {/* Render Past Shots */}
               {holeShots.map((s, i) => {
                   const curvePoints = MathUtils.getArcPoints(s.from, s.to);
@@ -760,7 +1060,7 @@ const PlayRound = () => {
               })}
 
               {/* Strategy Mode Visuals */}
-              {!isReplay && !isMeasureMode && (
+              {!isReplay && !isMeasureMode && !isNoteMode && (
                   <>
                       <Marker position={[currentBallPos.lat, currentBallPos.lng]} icon={shotNum === 1 ? startMarkerIcon : ballIcon} />
                       <Polyline positions={[[currentBallPos.lat, currentBallPos.lng], [predictedLanding.lat, predictedLanding.lng]]} pathOptions={{ color: "#3b82f6", weight: 3, dashArray: "5, 5" }} />
@@ -804,6 +1104,7 @@ const PlayRound = () => {
             <span className="text-gray-300">PAR {hole.par}</span><span className="text-gray-500">|</span><span className="text-white">{MathUtils.formatDistance(distToGreen, useYards)}</span>
           </div>
           {isMeasureMode && <div className="mt-2 text-xs text-blue-300 font-bold bg-blue-900/80 px-4 py-1 rounded-full border border-blue-500/30 inline-block shadow-lg animate-pulse">MEASUREMENT MODE</div>}
+          {isNoteMode && <div className="mt-2 text-xs text-yellow-300 font-bold bg-yellow-900/80 px-4 py-1 rounded-full border border-yellow-500/30 inline-block shadow-lg animate-pulse">ANNOTATION MODE</div>}
         </div>
 
         <div className="pointer-events-auto flex flex-col gap-2 items-end">
@@ -816,6 +1117,14 @@ const PlayRound = () => {
                >
                   <Ruler size={20} />
                </button>
+               
+               <button 
+                onClick={toggleNoteMode} 
+                className={`p-2.5 rounded-full shadow-lg backdrop-blur-md border border-white/10 transition-all active:scale-95 ${isNoteMode ? 'bg-yellow-600 text-white' : 'bg-black/50 text-yellow-400 hover:bg-black/70'}`}
+               >
+                  <PenTool size={20} />
+               </button>
+
                <button onClick={() => setShowWind(!showWind)} className={`p-2.5 rounded-full shadow-lg backdrop-blur-md border border-white/10 transition-all active:scale-95 ${showWind ? 'bg-black/70 text-blue-400' : 'bg-black/50 text-gray-400 hover:bg-black/70'}`}><Wind size={20} /></button>
              </>
            )}
@@ -862,7 +1171,76 @@ const PlayRound = () => {
         </div>
       )}
 
-      {!isReplay ? (
+      {/* NEW: ANNOTATION TOOLBAR */}
+      {isNoteMode && (
+          <div className="absolute bottom-[20%] left-1/2 -translate-x-1/2 z-[1000] bg-gray-900/90 backdrop-blur-xl border border-yellow-500/30 rounded-2xl p-2 flex gap-2 shadow-2xl scale-110">
+              <button 
+                onClick={() => setActiveTool('text')}
+                className={`p-3 rounded-xl transition-all ${activeTool === 'text' ? 'bg-yellow-500 text-black shadow-lg' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
+              >
+                  <Type size={20} />
+              </button>
+              <button 
+                onClick={() => setActiveTool('pin')}
+                className={`p-3 rounded-xl transition-all ${activeTool === 'pin' ? 'bg-yellow-500 text-black shadow-lg' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
+              >
+                  <Flag size={20} />
+              </button>
+              <button 
+                onClick={() => setActiveTool('draw')}
+                className={`p-3 rounded-xl transition-all ${activeTool === 'draw' ? 'bg-yellow-500 text-black shadow-lg' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
+              >
+                  <Highlighter size={20} />
+              </button>
+              <div className="w-px bg-gray-700 mx-1"></div>
+              <button 
+                onClick={() => setActiveTool('eraser')}
+                className={`p-3 rounded-xl transition-all ${activeTool === 'eraser' ? 'bg-red-500 text-white shadow-lg' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
+              >
+                  <Eraser size={20} />
+              </button>
+          </div>
+      )}
+      
+      {/* Drawing Actions (Finish/Cancel) */}
+      {isNoteMode && activeTool === 'draw' && drawingPoints.length > 0 && (
+          <div className="absolute bottom-[10%] left-1/2 -translate-x-1/2 z-[1000] flex gap-2">
+               <button 
+                 onClick={handleFinishDrawing}
+                 className="bg-green-600 text-white px-4 py-2 rounded-full font-bold shadow-lg flex items-center gap-2 animate-bounce"
+               >
+                   <Check size={16}/> Finish Line
+               </button>
+               <button 
+                 onClick={() => setDrawingPoints([])}
+                 className="bg-gray-800 text-white px-4 py-2 rounded-full font-bold shadow-lg flex items-center gap-2"
+               >
+                   <X size={16}/> Clear
+               </button>
+          </div>
+      )}
+
+      {/* Text Input Modal */}
+      {showTextInput && (
+          <ModalOverlay onClose={() => setShowTextInput(null)}>
+              <div className="p-4 bg-gray-900 rounded-xl">
+                  <h3 className="text-white font-bold mb-2">Add Note</h3>
+                  <textarea 
+                    autoFocus
+                    value={textInputValue}
+                    onChange={(e) => setTextInputValue(e.target.value)}
+                    className="w-full bg-gray-800 text-white p-3 rounded-lg border border-gray-700 focus:border-yellow-500 outline-none h-24 mb-4 resize-none"
+                    placeholder="E.g. Fast green, aiming point..."
+                  />
+                  <div className="flex gap-2">
+                      <button onClick={() => setShowTextInput(null)} className="flex-1 py-2 bg-gray-800 rounded-lg text-gray-400 font-bold">Cancel</button>
+                      <button onClick={handleSaveTextNote} className="flex-1 py-2 bg-yellow-500 rounded-lg text-black font-bold">Save Note</button>
+                  </div>
+              </div>
+          </ModalOverlay>
+      )}
+
+      {!isReplay && !isNoteMode ? (
         <>
             <div className="absolute bottom-0 w-full z-30 pt-2 px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] bg-gradient-to-t from-black/95 via-black/80 to-transparent">
                 {isMeasureMode ? (
