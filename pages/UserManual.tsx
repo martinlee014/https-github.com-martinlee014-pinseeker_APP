@@ -1,4 +1,3 @@
-
 import { ChevronLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -34,13 +33,50 @@ const UserManual = () => {
         </p>
 
         <Section 
-          title="Managing Courses (New!)"
+          title="Measurement Mode (Rangefinder)"
           items={[
-            'Navigate to Settings > Course Database to view or add new courses.',
-            'Tap the "+" button to enter the Course Editor.',
-            'Type a location (e.g., "Pebble Beach") to find the course on the map.',
-            'Select a hole, then tap "Map" or "GPS" to set the Tee Box and Green locations.',
-            'Verify distances and Par in the summary screen before saving.'
+            'Tap the Ruler icon (top right) to enter measurement mode.',
+            '**New:** Tap the "MY LOC" button at the bottom to instantly snap the measurement start point to your current GPS position.',
+            'Tap anywhere else on the map to measure from your current ball position to that specific point (layup point).',
+            'The dashboard displays two distances: "From You" (Start to Target) and "To Pin" (Target to Green).'
+          ]}
+        />
+
+        <Section 
+          title="Annotation Tools"
+          items={[
+            'Tap the Pen icon (top right) to toggle Annotation Mode.',
+            '**Toolbar:** Select Text (T), Flag (Pin), or Draw (Highlighter).',
+            '**Draw:** Tap points to create a path, then tap "Finish Line" to save.',
+            '**Delete:** Select the Eraser (Red Icon) from the toolbar and tap any annotation to delete it instantly. Alternatively, long-press any annotation (without the Eraser) to verify deletion.'
+          ]}
+        />
+
+        <Section 
+          title="Wind Vane"
+          items={[
+             'Tap the Wind icon to open the compass overlay.',
+             'Drag the ring to align the "N" indicator with true North (or simply align the wind arrow relative to your shot).',
+             'The blue arrow visualizes the wind flow direction across the hole.'
+          ]}
+        />
+
+        <Section 
+          title="Recording Shots & GPS"
+          items={[
+            '**Record Shot:** Walk to your ball and tap the GPS button (bottom right) to save the shot landing spot.',
+            '**Move Tee Box:** Long-press (>1 sec) the GPS button to update the *start* position (Tee) to your current location.',
+            '**Manual Drop:** If GPS is weak, long-press anywhere on the map to manually drop your ball location.',
+            '**Undo:** Long-press the yellow shot marker on the map to delete the most recent shot and reset your position.'
+          ]}
+        />
+
+        <Section 
+          title="Course Management"
+          items={[
+            'Go to Settings > Course Database to view or add new courses.',
+            'Use the Course Editor to map Tee Boxes and Greens for custom courses.',
+            'Verify Par and Total Distance in the summary screen before saving.'
           ]}
         />
 
@@ -48,46 +84,8 @@ const UserManual = () => {
           title="Club Management"
           items={[
             'Go to Settings > Club Management to customize your golf bag.',
-            'Tap the "+" button to add a new club, or the Edit icon to modify an existing one.',
-            'Use the "Network Table" visualizer to define your dispersion. Adjust the "Width Scatter" (Left/Right miss) and "Depth Scatter" (Short/Long miss) sliders.',
-            'The blue ellipse on the grid represents your likely landing zone (68% confidence). This data is used to calculate strategy recommendations during your round.',
-            'Ensure "Carry" distances are accurate for the best club recommendations.'
-          ]}
-        />
-
-        <Section 
-          title="Advanced Tools (New!)"
-          items={[
-            'Measurement Mode: Tap the Ruler icon (top right) to enter measurement mode. Tap anywhere on the map to measure the distance from your ball to that point, and from that point to the green.',
-            'Wind Vane: Tap the Wind icon to open the compass. Drag the ring to set the wind direction relative to North. The blue arrow indicates the wind flow.'
-          ]}
-        />
-
-        <Section 
-          title="Playing a Hole"
-          items={[
-            'The map shows your current position (Blue), predicted landing zone (Target), and the Green (Red Flag).',
-            'Use the Club Selector at the bottom to choose your club. The dispersion ellipse (blue oval) updates based on your Club Management settings.',
-            'Use the "AIM" slider to adjust your shot direction relative to the pin.',
-            'The "Plays Like" distance accounts for wind (simulate wind via the wind icon in top right).'
-          ]}
-        />
-
-        <Section 
-          title="Recording Shots & Undo"
-          items={[
-            'Walk to your ball and tap the GPS button to save your actual location.',
-            'If GPS is unavailable or inaccurate, long-press anywhere on the map to manually drop your ball location.',
-            'Undo: If you record a shot incorrectly, long-press the yellow shot marker on the map. A dialog will appear allowing you to delete it. Deleting the most recent shot will reset your position to the previous spot.'
-          ]}
-        />
-
-        <Section 
-          title="Finishing a Hole"
-          items={[
-            'Tap the Flag icon in the top right corner when you are done putting.',
-            'Enter total Putts and Penalties.',
-            'The score is calculated automatically and saved to your scorecard.'
+            'Use the "Network Table" visualizer to define your dispersion (Width/Depth scatter).',
+            'The blue ellipse on the map represents your likely landing zone based on these settings.'
           ]}
         />
       </div>

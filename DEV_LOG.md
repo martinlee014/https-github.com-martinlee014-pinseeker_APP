@@ -1,6 +1,20 @@
 
 # PinSeeker Web - Development Log
 
+## Version: V7.9.1 (Measurement & Interactions)
+**Date:** 2024-05-30
+**Branch:** `main`
+**Status:** ✅ RELEASED
+
+### Features
+- **GPS Measurement Button**: Added a dedicated **"MY LOC"** button in Measurement Mode.
+  - Previously, Measurement Mode always started from the *last recorded shot*. Users can now instantly snap the start point to their *current physical location* to measure layup distances from where they are standing.
+- **Annotation Interactions**:
+  - **Eraser Tool**: Added a dedicated Eraser tool (Red Icon) to the Annotation Toolbar. When selected, tapping any annotation (Text, Flag, or Drawing) deletes it immediately.
+  - **Pointer Events**: Refactored map event handling to support `PointerEvent`, ensuring consistent "Long Press" and "Click" behavior across Android, iOS, and Desktop touchscreens.
+- **Multi-Touch Fix**: 
+  - Fixed an issue where pinch-zooming (two fingers) would accidentally place a measurement point or manual ball drop. The app now detects multi-touch gestures and invalidates click events until the fingers are lifted.
+
 ## Version: V7.9.0 (Precision & Privacy)
 **Date:** 2024-05-29
 **Branch:** `main`
