@@ -1,6 +1,16 @@
 
 # PinSeeker Web - Development Log
 
+## Version: V7.9.2 (Navigation & Flow)
+**Date:** 2024-05-30
+**Branch:** `main`
+**Status:** ✅ RELEASED
+
+### Features
+- **Quick Exit Navigation**: Added a **Home** button to the top-left control stack in both **Play Round** and **Course Editor** modes.
+  - Allows users to quickly exit the immersive view to adjust global settings (like Bag setup) or switch tasks without using browser back buttons multiple times.
+  - Game state is automatically preserved via the existing temp-storage mechanism, allowing seamless resumption.
+
 ## Version: V7.9.1 (Measurement & Interactions)
 **Date:** 2024-05-30
 **Branch:** `main`

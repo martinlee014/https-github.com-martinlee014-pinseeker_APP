@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useContext, Fragment, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, useMapEvents, Polyline, useMap } from 'react-leaflet';
@@ -7,7 +6,7 @@ import { AppContext } from '../App';
 import { StorageService } from '../services/storage';
 import * as MathUtils from '../services/mathUtils';
 import { GolfCourse, GolfHole } from '../types';
-import { ChevronLeft, Save, MapPin, Target, Search, Loader2, ArrowLeft, ArrowRight, Check, X, Edit3 } from 'lucide-react';
+import { ChevronLeft, Save, MapPin, Target, Search, Loader2, ArrowLeft, ArrowRight, Check, X, Edit3, Home } from 'lucide-react';
 import { ModalOverlay } from '../components/Modals';
 
 // --- Icons Configuration ---
@@ -282,6 +281,7 @@ const CourseEditor = () => {
                 <button onClick={() => navigate('/settings/courses')} className="p-2 bg-gray-800 rounded-lg">
                     <ChevronLeft />
                 </button>
+                <button onClick={() => navigate('/dashboard')} className="p-2 bg-gray-800 rounded-lg"><Home className="text-white" size={20}/></button>
                 <h1 className="text-2xl font-bold">{existingId ? 'Edit Course' : 'New Course'}</h1>
               </div>
 
@@ -425,6 +425,9 @@ const CourseEditor = () => {
              <div className="absolute top-4 left-4 z-[1000] flex gap-2">
                 <button onClick={() => setStep('info')} className="bg-black/60 p-3 rounded-full text-white backdrop-blur-md border border-white/10 hover:bg-black/80">
                     <ChevronLeft size={24} />
+                </button>
+                <button onClick={() => navigate('/dashboard')} className="bg-black/60 p-3 rounded-full text-white backdrop-blur-md border border-white/10 hover:bg-black/80">
+                    <Home size={24} />
                 </button>
              </div>
              
