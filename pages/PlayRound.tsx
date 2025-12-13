@@ -10,7 +10,7 @@ import * as MathUtils from '../services/mathUtils';
 import { ClubStats, HoleScore, ShotRecord, RoundHistory, LatLng, GolfCourse } from '../types';
 import ClubSelector from '../components/ClubSelector';
 import { ScoreModal, ShotConfirmModal, HoleSelectorModal, FullScorecardModal, ModalOverlay } from '../components/Modals';
-import { Flag, Wind, ChevronLeft, Grid, ListChecks, ArrowLeft, ArrowRight, ChevronDown, MapPin, Ruler, Trash2, AlertTriangle } from 'lucide-react';
+import { Flag, Wind, ChevronLeft, Grid, ListChecks, ArrowLeft, ArrowRight, ChevronDown, MapPin, Ruler, Trash2 } from 'lucide-react';
 
 // --- Icons Setup ---
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -131,15 +131,24 @@ const createDistanceLabelIcon = (text: string, rotation: number, color: string =
   iconAnchor: [20, 15] 
 });
 
-// Refactored to include Long Press detection for touch devices
-const RotatedMapHandler = ({ rotation, onLongPress }: { rotation: number, onLongPress: (latlng: LatLng) => void }) => {
+// RotatedMapHandler: Handles Pan, Click, and Long Press with CSS Transform correction
+const RotatedMapHandler = ({ 
+    rotation, 
+    onLongPress,
+    onClick
+}: { 
+    rotation: number, 
+    onLongPress: (latlng: LatLng) => void,
+    onClick: (latlng: LatLng) => void
+}) => {
   const map = useMap();
   const isDragging = useRef(false);
   const lastPos = useRef<{x: number, y: number} | null>(null);
   
-  // Long Press Refs
+  // Interaction Refs
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startClientPos = useRef<{x: number, y: number} | null>(null);
+  const hasMovedSignificantly = useRef(false);
 
   useEffect(() => {
     const container = map.getContainer();
@@ -151,90 +160,95 @@ const RotatedMapHandler = ({ rotation, onLongPress }: { rotation: number, onLong
       return { x: (e as MouseEvent).clientX, y: (e as MouseEvent).clientY };
     };
 
-    const handleLongPress = (clientPos: {x: number, y: number}) => {
-        // --- Fix for Coordinate Mismatch on Rotated/Scaled Map ---
-        const viewportW = window.innerWidth;
-        const viewportH = window.innerHeight;
-        const cx = viewportW / 2;
-        const cy = viewportH / 2;
+    const calculateLatLng = (clientPos: {x: number, y: number}) => {
+        // --- PRECISION COORDINATE TRANSFORM ---
+        const rect = container.getBoundingClientRect();
+        // Center of the MAP CONTAINER (not necessarily window center)
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
 
         const dx = clientPos.x - cx;
         const dy = clientPos.y - cy;
 
+        // Undo Scale
         const scale = 1.4;
         const unscaledDx = dx / scale;
         const unscaledDy = dy / scale;
 
+        // Undo Rotation
+        // CSS rotates clockwise by 'rotation'. To undo, rotate counter-clockwise by 'rotation'.
+        // Or rotate by -rotation.
+        // angleRad needs to align with standard trig circle (CCW is positive).
+        // If rotation is 90 (clockwise), we want to rotate -90 (CCW).
         const angleRad = (-rotation * Math.PI) / 180;
         
         const rotatedX = unscaledDx * Math.cos(angleRad) - unscaledDy * Math.sin(angleRad);
         const rotatedY = unscaledDx * Math.sin(angleRad) + unscaledDy * Math.cos(angleRad);
 
         const mapSize = map.getSize();
+        // Leaflet internal center
         const mapCx = mapSize.x / 2;
         const mapCy = mapSize.y / 2;
         
         const leafPoint = L.point(mapCx + rotatedX, mapCy + rotatedY);
-        const latlng = map.containerPointToLatLng(leafPoint);
-        
+        return map.containerPointToLatLng(leafPoint);
+    };
+
+    const handleLongPress = (clientPos: {x: number, y: number}) => {
+        const latlng = calculateLatLng(clientPos);
         if (navigator.vibrate) navigator.vibrate(50);
-        
         onLongPress({ lat: latlng.lat, lng: latlng.lng });
     };
 
     const handleStart = (e: MouseEvent | TouchEvent) => {
       if ((e as MouseEvent).button === 2) return; 
 
-      // --- Multi-touch Detection (Pinch Zoom Fix) ---
       if (window.TouchEvent && e instanceof TouchEvent && e.touches.length > 1) {
-          if (longPressTimer.current) {
-              clearTimeout(longPressTimer.current);
-              longPressTimer.current = null;
-          }
+          if (longPressTimer.current) clearTimeout(longPressTimer.current);
           isDragging.current = false;
           return;
       }
 
       isDragging.current = true;
+      hasMovedSignificantly.current = false;
       const pos = getClientPos(e);
       lastPos.current = pos;
       startClientPos.current = pos;
 
       longPressTimer.current = setTimeout(() => {
           isDragging.current = false;
-          handleLongPress(pos);
+          if (!hasMovedSignificantly.current) {
+              handleLongPress(pos);
+              startClientPos.current = null; // Consume event
+          }
       }, 600);
-
-      if(e.cancelable && (!window.TouchEvent || !(e instanceof TouchEvent))) {
-         e.preventDefault(); 
-      }
+      
+      // Stop propagation to prevent Leaflet from double-handling or handling incorrectly due to CSS transform
+      // But allow default for some touch actions if needed, though we handle pan manually.
     };
 
     const handleMove = (e: MouseEvent | TouchEvent) => {
       if (window.TouchEvent && e instanceof TouchEvent && e.touches.length > 1) {
-          if (longPressTimer.current) {
-              clearTimeout(longPressTimer.current);
-              longPressTimer.current = null;
-          }
+          if (longPressTimer.current) clearTimeout(longPressTimer.current);
           isDragging.current = false;
           return;
       }
 
       const currentPos = getClientPos(e);
 
-      if (startClientPos.current && longPressTimer.current) {
+      if (startClientPos.current) {
           const moveDist = Math.sqrt(
               Math.pow(currentPos.x - startClientPos.current.x, 2) + 
               Math.pow(currentPos.y - startClientPos.current.y, 2)
           );
           if (moveDist > 5) {
-              clearTimeout(longPressTimer.current);
-              longPressTimer.current = null;
+              hasMovedSignificantly.current = true;
+              if (longPressTimer.current) clearTimeout(longPressTimer.current);
           }
       }
 
       if (!isDragging.current || !lastPos.current) return;
-      if(e.cancelable) e.preventDefault();
+      if(e.cancelable) e.preventDefault(); 
 
       const deltaX = currentPos.x - lastPos.current.x;
       const deltaY = currentPos.y - lastPos.current.y;
@@ -247,11 +261,17 @@ const RotatedMapHandler = ({ rotation, onLongPress }: { rotation: number, onLong
       lastPos.current = currentPos;
     };
 
-    const handleEnd = () => {
+    const handleEnd = (e: MouseEvent | TouchEvent) => {
       if (longPressTimer.current) {
           clearTimeout(longPressTimer.current);
           longPressTimer.current = null;
       }
+
+      if (startClientPos.current && !hasMovedSignificantly.current) {
+         const latlng = calculateLatLng(startClientPos.current);
+         onClick({ lat: latlng.lat, lng: latlng.lng });
+      }
+
       isDragging.current = false;
       lastPos.current = null;
       startClientPos.current = null;
@@ -272,7 +292,7 @@ const RotatedMapHandler = ({ rotation, onLongPress }: { rotation: number, onLong
       window.removeEventListener('mouseup', handleEnd);
       window.removeEventListener('touchend', handleEnd);
     };
-  }, [map, rotation, onLongPress]);
+  }, [map, rotation, onLongPress, onClick]);
 
   return null;
 };
@@ -297,9 +317,9 @@ const MapInitializer = ({ center, isReplay, pointsToFit }: { center: LatLng, isR
     return null;
 }
 
-const MapEvents = ({ onMapClick, onMapLongPress }: any) => {
+// Only used for context menu (Right click) on desktop now
+const MapEvents = ({ onMapLongPress }: any) => {
   useMapEvents({
-    click: (e) => onMapClick(e.latlng),
     contextmenu: (e) => onMapLongPress(e.latlng)
   });
   return null;
@@ -358,12 +378,8 @@ const PlayRound = () => {
     
     // Initialize state
     if (isReplay && replayRound) {
-        // Try to find the course used in the replay if possible, or fallback to passed
-        // For simplicity, replay might rely on DUVENHOF if courseName matches, or we'd need to store full hole data in history.
-        // For this iteration, we assume replays use the currently active course data structure.
         setShots(replayRound.shots);
         setScorecard(replayRound.scorecard);
-        // Find correct start pos
         const h = activeCourse.holes[initialHoleIdx];
         if (h) setCurrentBallPos(h.tee);
     } else {
@@ -372,7 +388,6 @@ const PlayRound = () => {
         if (searchParams.get('restore') === 'true' && user) {
             const saved = StorageService.getTempState(user);
             if (saved) {
-                // If saved state has a courseId, we should try to load that course
                 if (saved.courseId) {
                    const allCourses = StorageService.getAllCourses();
                    const savedCourse = allCourses.find(c => c.id === saved.courseId);
@@ -384,22 +399,16 @@ const PlayRound = () => {
                 setShotNum(saved.currentShotNum);
                 setCurrentBallPos(saved.currentBallPos);
             } else {
-                 // Fallback if restore requested but no data
                  if (hole) setCurrentBallPos(hole.tee);
             }
         } else {
-             // Fresh Start
              if (hole) setCurrentBallPos(hole.tee);
         }
     }
   }, []);
 
-  // Update ball position when hole changes (if not restoring)
   useEffect(() => {
       if (hole && shotNum === 1 && !pendingShot) {
-          // If we just switched holes and haven't hit a shot, reset to tee
-          // But check if we already set it via restore
-          // Simple logic: if shotNum is 1, ensure we are at Tee
           const isAtTee = currentBallPos.lat === hole.tee.lat && currentBallPos.lng === hole.tee.lng;
           if (!isAtTee && shots.filter(s => s.holeNumber === hole.number).length === 0) {
               setCurrentBallPos(hole.tee);
@@ -463,8 +472,6 @@ const PlayRound = () => {
       lng: predictedLanding.lng + (hole.green.lng - predictedLanding.lng) * 0.33
   }), [predictedLanding, hole]);
 
-  // --- Measurement Calculations ---
-  // If no target selected, default to predicted landing for initial visual
   const activeMeasureTarget = measureTarget || predictedLanding;
   
   const measureDist1 = useMemo(() => MathUtils.calculateDistance(currentBallPos, activeMeasureTarget), [currentBallPos, activeMeasureTarget]);
@@ -503,13 +510,11 @@ const PlayRound = () => {
   const handleMapClick = (latlng: any) => {
     if (isReplay) return;
     
-    // Measurement Mode: Click sets the measurement target
     if (isMeasureMode) {
         setMeasureTarget({ lat: latlng.lat, lng: latlng.lng });
         return;
     }
 
-    // Normal Mode: Click aims
     const clicked: LatLng = { lat: latlng.lat, lng: latlng.lng };
     const bearingToClick = MathUtils.calculateBearing(currentBallPos, clicked);
     let diff = bearingToClick - baseBearing;
@@ -525,7 +530,6 @@ const PlayRound = () => {
     setPendingShot({ pos, isGPS: false, dist });
   };
 
-  // --- GPS Logic for Short Press (Record Shot / Landing Point) ---
   const initiateGPSShot = () => {
     if (!navigator.geolocation) {
       alert("Geolocation not supported");
@@ -541,7 +545,6 @@ const PlayRound = () => {
     );
   };
 
-  // --- GPS Logic for Long Press (Update Tee/Start Position) ---
   const setTeeToGPS = () => {
     if (!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition((pos) => {
@@ -608,21 +611,14 @@ const PlayRound = () => {
 
   const handleDeleteShot = () => {
     if (!shotToDelete) return;
-    
-    // Check if we are deleting the most recent shot of the current hole
     const holeShotsList = shots.filter(s => s.holeNumber === hole.number);
     const isMostRecent = holeShotsList.length > 0 && holeShotsList[holeShotsList.length - 1] === shotToDelete;
-
-    // Filter out the shot
     const newShots = shots.filter(s => s !== shotToDelete);
     setShots(newShots);
-
-    // If it was the latest shot, revert game state (Undo)
     if (isMostRecent) {
         setCurrentBallPos(shotToDelete.from);
         setShotNum(Math.max(1, shotToDelete.shotNumber));
     }
-
     setShotToDelete(null);
   };
 
@@ -675,14 +671,11 @@ const PlayRound = () => {
       const newState = !isMeasureMode;
       setIsMeasureMode(newState);
       if (newState) {
-          // Reset aim to straight when entering measure mode
           setAimAngle(0);
-          // Set target to predicted so lines appear immediately
           setMeasureTarget(predictedLanding); 
       }
   };
 
-  // --- Wind Vane Interaction ---
   const handleWindCircleInteract = (e: React.MouseEvent | React.TouchEvent) => {
       const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
       const cx = rect.width / 2;
@@ -717,9 +710,9 @@ const PlayRound = () => {
         <div style={{ width: '100%', height: '100%', transform: `rotate(${mapRotation}deg) scale(1.4)`, transition: 'transform 0.8s cubic-bezier(0.4, 0, 0.2, 1)' }}>
             <MapContainer key={`${activeCourse.id}-${currentHoleIdx}`} center={[hole.tee.lat, hole.tee.lng]} zoom={18} className="h-full w-full bg-black" zoomControl={false} attributionControl={false} dragging={false} doubleClickZoom={false}>
               <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" />
-              <RotatedMapHandler rotation={mapRotation} onLongPress={handleManualDrop} />
+              <RotatedMapHandler rotation={mapRotation} onLongPress={handleManualDrop} onClick={handleMapClick} />
               <MapInitializer center={currentBallPos} isReplay={isReplay} pointsToFit={replayPoints} />
-              <MapEvents onMapClick={handleMapClick} onMapLongPress={handleManualDrop} />
+              <MapEvents onMapLongPress={handleManualDrop} />
               <Marker position={[hole.green.lat, hole.green.lng]} icon={flagIcon} />
               
               {/* Render Past Shots */}
@@ -783,13 +776,8 @@ const PlayRound = () => {
                   <>
                       <Marker position={[currentBallPos.lat, currentBallPos.lng]} icon={ballIcon} />
                       <Marker position={[activeMeasureTarget.lat, activeMeasureTarget.lng]} icon={measureTargetIcon} />
-                      
-                      {/* Line 1: Ball -> Target (Blue Solid) */}
                       <Polyline positions={[[currentBallPos.lat, currentBallPos.lng], [activeMeasureTarget.lat, activeMeasureTarget.lng]]} pathOptions={{ color: "#60a5fa", weight: 4, opacity: 1 }} />
-                      {/* Line 2: Target -> Green (White Dashed) */}
                       <Polyline positions={[[activeMeasureTarget.lat, activeMeasureTarget.lng], [hole.green.lat, hole.green.lng]]} pathOptions={{ color: "#ffffff", weight: 3, dashArray: "8, 8", opacity: 0.8 }} />
-
-                      {/* Labels */}
                       <Marker position={[labelPos1.lat, labelPos1.lng]} icon={createDistanceLabelIcon(MathUtils.formatDistance(measureDist1, useYards), -mapRotation, '#60a5fa')} />
                       <Marker position={[labelPos2.lat, labelPos2.lng]} icon={createDistanceLabelIcon(MathUtils.formatDistance(measureDist2, useYards), -mapRotation, '#ffffff')} />
                   </>
@@ -819,27 +807,23 @@ const PlayRound = () => {
         </div>
 
         <div className="pointer-events-auto flex flex-col gap-2 items-end">
-           {/* Primary Controls Stack */}
            {!isReplay && (
              <>
                <button onClick={() => setShowScoreModal(true)} className="bg-green-600/90 p-2.5 rounded-full text-white shadow-lg shadow-green-900/50 backdrop-blur-md border border-white/10 hover:bg-green-500 transition-all active:scale-95"><Flag size={20} fill="white"/></button>
-               
                <button 
                 onClick={toggleMeasureMode} 
                 className={`p-2.5 rounded-full shadow-lg backdrop-blur-md border border-white/10 transition-all active:scale-95 ${isMeasureMode ? 'bg-blue-600 text-white' : 'bg-black/50 text-blue-400 hover:bg-black/70'}`}
                >
                   <Ruler size={20} />
                </button>
-               
                <button onClick={() => setShowWind(!showWind)} className={`p-2.5 rounded-full shadow-lg backdrop-blur-md border border-white/10 transition-all active:scale-95 ${showWind ? 'bg-black/70 text-blue-400' : 'bg-black/50 text-gray-400 hover:bg-black/70'}`}><Wind size={20} /></button>
              </>
            )}
         </div>
       </div>
-
+      
       {showWind && (
         <div className="absolute top-20 right-14 z-[1000] bg-black/90 backdrop-blur-xl p-4 rounded-2xl border border-gray-700 w-48 text-gray-300 shadow-2xl flex flex-col gap-4">
-            {/* Wind Panel Content - Reduced duplication for brevity, same as previous */}
             <div className="flex items-center justify-between border-b border-gray-800 pb-2">
                 <span className="font-bold text-white text-sm flex items-center gap-2"><Wind size={16}/> Wind</span>
                 <span className="text-xs bg-blue-900/50 text-blue-300 px-2 py-0.5 rounded border border-blue-500/30">{windSpeed} m/s</span>
@@ -847,7 +831,6 @@ const PlayRound = () => {
             <div>
                 <input type="range" min="0" max="20" value={windSpeed} onChange={(e) => setWindSpeed(parseInt(e.target.value))} className="w-full accent-blue-500 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer" />
             </div>
-            {/* Compass - Same as before */}
             <div className="relative w-32 h-32 mx-auto select-none touch-none"
                  onMouseDown={(e) => { if(e.buttons===1) handleWindCircleInteract(e); }}
                  onMouseMove={(e) => { if(e.buttons===1) handleWindCircleInteract(e); }}
@@ -879,7 +862,6 @@ const PlayRound = () => {
         </div>
       )}
 
-      {/* Bottom Controls - Same as before */}
       {!isReplay ? (
         <>
             <div className="absolute bottom-0 w-full z-30 pt-2 px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] bg-gradient-to-t from-black/95 via-black/80 to-transparent">
@@ -950,8 +932,6 @@ const PlayRound = () => {
       {showScoreModal && <ScoreModal par={hole.par} holeNum={hole.number} onSave={saveHoleScore} onClose={() => setShowScoreModal(false)} />}
       {showFullCard && <FullScorecardModal holes={activeCourse.holes} scorecard={scorecard} onFinishRound={finishRound} onClose={() => setShowFullCard(false)} />}
       {pendingShot && <ShotConfirmModal dist={MathUtils.formatDistance(pendingShot.dist, useYards)} club={selectedClub} clubs={bag} isGPS={pendingShot.isGPS} isLongDistWarning={pendingShot.dist > 500} onChangeClub={setSelectedClub} onConfirm={confirmShot} onCancel={() => setPendingShot(null)} />}
-      
-      {/* Delete Shot Confirmation Modal */}
       {shotToDelete && (
         <ModalOverlay onClose={() => setShotToDelete(null)}>
             <div className="p-6 bg-gray-900 text-center rounded-2xl">
@@ -964,18 +944,8 @@ const PlayRound = () => {
                     {shots.indexOf(shotToDelete) === shots.length - 1 && " This will reset your position to the previous shot."}
                 </p>
                 <div className="flex gap-3">
-                    <button 
-                        onClick={() => setShotToDelete(null)}
-                        className="flex-1 bg-gray-800 hover:bg-gray-700 text-white font-bold py-3 rounded-xl border border-gray-700"
-                    >
-                        Cancel
-                    </button>
-                    <button 
-                        onClick={handleDeleteShot}
-                        className="flex-1 bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-xl shadow-lg"
-                    >
-                        Delete
-                    </button>
+                    <button onClick={() => setShotToDelete(null)} className="flex-1 bg-gray-800 hover:bg-gray-700 text-white font-bold py-3 rounded-xl border border-gray-700">Cancel</button>
+                    <button onClick={handleDeleteShot} className="flex-1 bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-xl shadow-lg">Delete</button>
                 </div>
             </div>
         </ModalOverlay>

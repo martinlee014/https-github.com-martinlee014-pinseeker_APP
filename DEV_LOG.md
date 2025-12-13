@@ -1,6 +1,25 @@
 
 # PinSeeker Web - Development Log
 
+## Version: V7.9.0 (Precision & Privacy)
+**Date:** 2024-05-29
+**Branch:** `main`
+**Status:** ✅ RELEASED
+
+### Features
+- **Feedback 2.0 (Privacy Focused)**: Replaced the external email link with an integrated **In-App Feedback Form**.
+  - Users can now submit bugs, suggestions, or course data issues directly within the app via a modal.
+  - Supports **anonymous submission** (email field is optional).
+  - Data is structured to be sent to the operations team (`Mypinseeker@gmail.com`).
+- **Course Editor Precision**:
+  - **Deep Zoom**: Increased maximum map zoom level from 19 to **22**. This allows for ultra-precise placement of markers on specific tee boxes or green tiers.
+  - **Draggable Markers**: Tee and Green icons are now draggable in edit mode. Users can drag them to refine positions pixel-by-pixel instead of relying solely on clicks.
+
+### Fixes
+- **Measurement Mode Coordinates**: Fixed a critical bug where clicking on the map in Measurement Mode resulted in a target point offset from the finger/cursor location.
+  - **Root Cause**: The CSS `transform: rotate()` used for the dynamic camera view was interfering with Leaflet's default coordinate projection.
+  - **Fix**: Implemented a calibrated inverse transformation matrix in `RotatedMapHandler` to map screen pixels accurately back to map coordinates, regardless of rotation or scale.
+
 ## Version: V7.8.0 (Shot Undo & Refinement)
 **Date:** 2024-05-28
 **Branch:** `main`

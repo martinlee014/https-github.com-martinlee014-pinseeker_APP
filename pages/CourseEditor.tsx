@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useContext, Fragment, useMemo } from 'react';
+import { useState, useEffect, useContext, Fragment, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, useMapEvents, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
@@ -12,7 +12,6 @@ import { ModalOverlay } from '../components/Modals';
 
 // --- Icons Configuration ---
 
-// Large Flag for Active Green
 const flagIcon = new L.Icon({
   iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
@@ -22,15 +21,13 @@ const flagIcon = new L.Icon({
   shadowSize: [41, 41]
 });
 
-// Large Tee for Active Hole
 const startIcon = new L.DivIcon({
   className: 'custom-start-icon',
-  html: `<div style="width: 16px; height: 16px; background-color: #ffffff; border-radius: 50%; border: 4px solid #111827; box-shadow: 0 0 10px rgba(0,0,0,0.5);"></div>`,
+  html: `<div style="width: 16px; height: 16px; background-color: #ffffff; border-radius: 50%; border: 4px solid #111827; box-shadow: 0 0 10px rgba(0,0,0,0.5); cursor: move;"></div>`,
   iconSize: [16, 16],
   iconAnchor: [8, 8]
 });
 
-// Small Dot for Completed Tee (Overview)
 const miniTeeIcon = new L.DivIcon({
   className: 'mini-tee-icon',
   html: `<div style="width: 10px; height: 10px; background-color: #9ca3af; border-radius: 50%; border: 2px solid #374151;"></div>`,
@@ -38,7 +35,6 @@ const miniTeeIcon = new L.DivIcon({
   iconAnchor: [5, 5]
 });
 
-// Small Dot for Completed Green (Overview)
 const miniGreenIcon = new L.DivIcon({
   className: 'mini-green-icon',
   html: `<div style="width: 10px; height: 10px; background-color: #ef4444; border-radius: 50%; border: 2px solid #7f1d1d;"></div>`,
@@ -46,7 +42,6 @@ const miniGreenIcon = new L.DivIcon({
   iconAnchor: [5, 5]
 });
 
-// Helper to create label icons dynamically
 const createHoleLabel = (text: string, isActive: boolean) => new L.DivIcon({
   className: 'bg-transparent',
   html: `
@@ -67,10 +62,9 @@ const createHoleLabel = (text: string, isActive: boolean) => new L.DivIcon({
     </div>
   `,
   iconSize: [0, 0],
-  iconAnchor: [0, 10] // Anchor slightly above the point
+  iconAnchor: [0, 10] 
 });
 
-// Arrow Icon for Direction
 const createDirectionArrow = (rotation: number, isActive: boolean) => new L.DivIcon({
   className: 'bg-transparent',
   html: `
@@ -86,11 +80,10 @@ const createDirectionArrow = (rotation: number, isActive: boolean) => new L.DivI
     "></div>
   `,
   iconSize: [12, 12],
-  iconAnchor: [6, 6] // Center
+  iconAnchor: [6, 6] 
 });
 
 
-// Map Click Handler
 const EditorMapEvents = ({ mode, onSetPoint }: { mode: 'tee' | 'green' | null, onSetPoint: (lat: number, lng: number) => void }) => {
     useMapEvents({
         click(e) {
@@ -102,11 +95,10 @@ const EditorMapEvents = ({ mode, onSetPoint }: { mode: 'tee' | 'green' | null, o
     return null;
 };
 
-// Component to fly to location when search changes
 const MapUpdater = ({ center }: { center: [number, number] }) => {
     const map = useMap();
     useEffect(() => {
-        map.setView(center, 16, { animate: true });
+        map.setView(center, 18, { animate: true }); 
     }, [center, map]);
     return null;
 };
@@ -123,7 +115,6 @@ const CourseEditor = () => {
   const [existingId, setExistingId] = useState<string | null>(null);
   const [showSummary, setShowSummary] = useState(false);
   
-  // 18 Holes
   const [holes, setHoles] = useState<GolfHole[]>(
       Array.from({ length: 18 }, (_, i) => ({
           number: i + 1,
@@ -136,23 +127,19 @@ const CourseEditor = () => {
   const [currentHoleIdx, setCurrentHoleIdx] = useState(0);
   const [editMode, setEditMode] = useState<'tee' | 'green' | null>(null);
   
-  // Map Center
   const [mapCenter, setMapCenter] = useState<[number, number]>([51.253031, 6.610690]); 
 
-  // Initialize Data
   useEffect(() => {
     if (existingCourse) {
         setExistingId(existingCourse.id);
         setCourseName(existingCourse.name);
         setHoles(existingCourse.holes);
         
-        // Try to find the first hole with data to center the map
         const firstPoint = existingCourse.holes.find(h => h.tee.lat !== 0);
         if (firstPoint) {
             setMapCenter([firstPoint.tee.lat, firstPoint.tee.lng]);
         }
     } else {
-        // Try to get GPS for map center if creating new
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(pos => {
                 setMapCenter([pos.coords.latitude, pos.coords.longitude]);
@@ -165,7 +152,6 @@ const CourseEditor = () => {
       if (!courseName.trim()) return;
       setIsSearching(true);
       try {
-          // Search for "Golf Course + Name" to be more specific
           const query = `Golf Club ${courseName}`;
           const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`);
           const data = await response.json();
@@ -174,9 +160,8 @@ const CourseEditor = () => {
               const lat = parseFloat(data[0].lat);
               const lon = parseFloat(data[0].lon);
               setMapCenter([lat, lon]);
-              setStep('map'); // Auto jump to map on successful search
+              setStep('map'); 
           } else {
-              // Fallback try without "Golf Club" prefix
               const fallbackResponse = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(courseName)}&limit=1`);
               const fallbackData = await fallbackResponse.json();
                if (fallbackData && fallbackData.length > 0) {
@@ -240,7 +225,18 @@ const CourseEditor = () => {
           newHoles[currentHoleIdx].green = { lat, lng };
       }
       setHoles(newHoles);
-      setEditMode(null); // Exit mode after setting
+      setEditMode(null); 
+  };
+
+  const handleMarkerDragEnd = (e: any, type: 'tee' | 'green', holeIdx: number) => {
+      const newPos = e.target.getLatLng();
+      const newHoles = [...holes];
+      if (type === 'tee') {
+          newHoles[holeIdx].tee = { lat: newPos.lat, lng: newPos.lng };
+      } else {
+          newHoles[holeIdx].green = { lat: newPos.lat, lng: newPos.lng };
+      }
+      setHoles(newHoles);
   };
 
   const updatePar = (delta: number) => {
@@ -261,7 +257,6 @@ const CourseEditor = () => {
   const hasTee = currentHole.tee.lat !== 0;
   const hasGreen = currentHole.green.lat !== 0;
 
-  // --- Summary Calculations ---
   const summaryStats = useMemo(() => {
     let totalDist = 0;
     let totalPar = 0;
@@ -270,7 +265,7 @@ const CourseEditor = () => {
         if (h.tee.lat !== 0 && h.green.lat !== 0) {
             d = MathUtils.calculateDistance(h.tee, h.green);
         }
-        if (d > 0) { // Only count holes that are set
+        if (d > 0) { 
             totalDist += d;
             totalPar += h.par;
         }
@@ -333,8 +328,12 @@ const CourseEditor = () => {
     <div className="h-screen flex flex-col bg-gray-900 relative overflow-hidden">
         {/* Map - takes remaining height */}
         <div className="flex-1 relative bg-black z-0">
-            <MapContainer center={mapCenter} zoom={16} className="h-full w-full" zoomControl={false}>
-                <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" />
+            <MapContainer center={mapCenter} zoom={18} className="h-full w-full" zoomControl={false} maxZoom={22}>
+                <TileLayer 
+                    url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" 
+                    maxNativeZoom={19}
+                    maxZoom={22}
+                />
                 <MapUpdater center={mapCenter} />
                 <EditorMapEvents mode={editMode} onSetPoint={updateHolePoint} />
                 
@@ -363,7 +362,7 @@ const CourseEditor = () => {
                                 <Polyline 
                                     positions={[[hole.tee.lat, hole.tee.lng], [hole.green.lat, hole.green.lng]]} 
                                     pathOptions={{ 
-                                        color: isActive ? '#ffffff' : '#fbbf24', // White for active, Yellow for history
+                                        color: isActive ? '#ffffff' : '#fbbf24', 
                                         weight: isActive ? 3 : 2,
                                         dashArray: isActive ? '5,5' : undefined, 
                                         opacity: isActive ? 0.9 : 0.6 
@@ -398,6 +397,10 @@ const CourseEditor = () => {
                                     position={[hole.tee.lat, hole.tee.lng]} 
                                     icon={isActive ? startIcon : miniTeeIcon} 
                                     zIndexOffset={isActive ? 1000 : 0}
+                                    draggable={isActive} 
+                                    eventHandlers={{
+                                        dragend: (e) => handleMarkerDragEnd(e, 'tee', idx)
+                                    }}
                                 />
                             )}
 
@@ -407,6 +410,10 @@ const CourseEditor = () => {
                                     position={[hole.green.lat, hole.green.lng]} 
                                     icon={isActive ? flagIcon : miniGreenIcon} 
                                     zIndexOffset={isActive ? 1000 : 0}
+                                    draggable={isActive} 
+                                    eventHandlers={{
+                                        dragend: (e) => handleMarkerDragEnd(e, 'green', idx)
+                                    }}
                                 />
                             )}
                         </Fragment>
@@ -429,8 +436,8 @@ const CourseEditor = () => {
 
             {/* Editing Overlay Instruction */}
             {editMode && (
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/80 text-white px-4 py-2 rounded-full text-sm font-bold pointer-events-none z-[1000] border border-white/20 animate-pulse">
-                    Tap map to set {editMode === 'tee' ? 'Tee Box' : 'Green'}
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/80 text-white px-4 py-2 rounded-full text-sm font-bold pointer-events-none z-[1000] border border-white/20 animate-pulse text-center w-max">
+                    Tap map OR drag marker to set {editMode === 'tee' ? 'Tee Box' : 'Green'}
                 </div>
             )}
         </div>

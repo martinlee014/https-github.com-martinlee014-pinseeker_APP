@@ -1,7 +1,7 @@
 
 import { useContext, useEffect, useState } from 'react';
 import { AppContext } from '../App';
-import { BookOpen, Ruler, Briefcase, Download, Smartphone, Share, PlusSquare, Info, Map } from 'lucide-react';
+import { BookOpen, Ruler, Briefcase, Download, Smartphone, Share, PlusSquare, Info, Map, MessageSquare, Send, X, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ModalOverlay } from '../components/Modals';
 
@@ -11,6 +11,13 @@ const Settings = () => {
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [showInstallHelp, setShowInstallHelp] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
+  
+  // Feedback Form State
+  const [feedbackType, setFeedbackType] = useState('Suggestion');
+  const [feedbackEmail, setFeedbackEmail] = useState('');
+  const [feedbackText, setFeedbackText] = useState('');
+  const [isSending, setIsSending] = useState(false);
 
   useEffect(() => {
     // Detect iOS
@@ -28,7 +35,6 @@ const Settings = () => {
 
   const handleInstallClick = () => {
     if (installPrompt) {
-      // Automatic prompt available (Android/Chrome Desktop)
       installPrompt.prompt();
       installPrompt.userChoice.then((choiceResult: any) => {
         if (choiceResult.outcome === 'accepted') {
@@ -36,9 +42,42 @@ const Settings = () => {
         }
       });
     } else {
-      // Fallback: Show manual instructions (iOS or Browser not supporting trigger)
       setShowInstallHelp(true);
     }
+  };
+
+  const handleSendFeedback = async () => {
+    if (!feedbackText.trim()) return;
+    
+    setIsSending(true);
+    
+    // -------------------------------------------------------------------------
+    // NOTE: In a real deployment, you would replace this block with an API call 
+    // to a service like EmailJS, Formspree, or your own backend.
+    // Target: Mypinseeker@gmail.com
+    // -------------------------------------------------------------------------
+    
+    const payload = {
+        to: "Mypinseeker@gmail.com",
+        subject: `PinSeeker Feedback: ${feedbackType}`,
+        from: feedbackEmail || "Anonymous User",
+        message: feedbackText,
+        timestamp: new Date().toISOString()
+    };
+
+    console.log("Sending Feedback Payload:", payload);
+
+    // Simulate Network Delay
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    setIsSending(false);
+    setShowFeedback(false);
+    setFeedbackText('');
+    setFeedbackEmail('');
+    setFeedbackType('Suggestion');
+    
+    // Success feedback to user
+    alert("Feedback sent successfully! Thank you for helping us improve PinSeeker.");
   };
 
   return (
@@ -124,10 +163,24 @@ const Settings = () => {
                 <div className="text-xs text-gray-500">Learn how to use PinSeeker</div>
             </div>
         </button>
+
+        {/* Feedback */}
+        <button 
+            onClick={() => setShowFeedback(true)}
+            className="w-full bg-gray-900 rounded-xl p-4 flex items-center gap-3 border border-gray-800 hover:bg-gray-800 transition-colors"
+        >
+            <div className="bg-gray-800 p-2 rounded-lg">
+                <MessageSquare className="text-pink-500" size={20} />
+            </div>
+            <div className="text-left">
+                <div className="font-medium text-white">Send Feedback</div>
+                <div className="text-xs text-gray-500">Report bugs or suggest features</div>
+            </div>
+        </button>
       </div>
       
       <div className="text-center text-xs text-gray-600 mt-10">
-          PinSeeker Web v7.8.0
+          PinSeeker Web v7.9.0
       </div>
 
       {showInstallHelp && (
@@ -172,6 +225,70 @@ const Settings = () => {
                Close
              </button>
            </div>
+        </ModalOverlay>
+      )}
+
+      {showFeedback && (
+        <ModalOverlay onClose={() => setShowFeedback(false)}>
+             <div className="p-4 border-b border-gray-800 flex justify-between items-center bg-gray-900 shrink-0">
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                    <MessageSquare size={18} className="text-pink-500"/> App Feedback
+                </h3>
+                <button type="button" onClick={() => setShowFeedback(false)}><X className="text-gray-400" /></button>
+            </div>
+            <div className="p-6 bg-gray-900 overflow-y-auto max-h-[70vh]">
+                <p className="text-sm text-gray-400 mb-6">
+                    Help us improve PinSeeker. Your feedback will be sent directly to the development team.
+                </p>
+                
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Feedback Type</label>
+                        <select 
+                            value={feedbackType}
+                            onChange={(e) => setFeedbackType(e.target.value)}
+                            className="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-white outline-none focus:border-pink-500"
+                        >
+                            <option value="Suggestion">Feature Suggestion</option>
+                            <option value="Bug Report">Bug Report</option>
+                            <option value="Course Data">Course Data Issue</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                            Your Email <span className="text-gray-600 font-normal lowercase">(Optional)</span>
+                        </label>
+                        <input 
+                            type="email"
+                            value={feedbackEmail}
+                            onChange={(e) => setFeedbackEmail(e.target.value)}
+                            placeholder="Leave blank to stay anonymous"
+                            className="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-white outline-none focus:border-pink-500"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Message</label>
+                        <textarea 
+                            className="w-full bg-gray-800 border border-gray-700 rounded-lg p-4 text-white h-32 focus:border-pink-500 outline-none resize-none"
+                            placeholder="Describe your issue or idea..."
+                            value={feedbackText}
+                            onChange={(e) => setFeedbackText(e.target.value)}
+                        />
+                    </div>
+
+                    <button 
+                        onClick={handleSendFeedback}
+                        disabled={isSending || !feedbackText.trim()}
+                        className="w-full bg-pink-600 hover:bg-pink-500 disabled:bg-gray-800 disabled:text-gray-500 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 shadow-lg transition-all"
+                    >
+                        {isSending ? <Loader2 className="animate-spin" size={18} /> : <Send size={18} />}
+                        {isSending ? 'Sending...' : 'Submit Feedback'}
+                    </button>
+                </div>
+            </div>
         </ModalOverlay>
       )}
     </div>
