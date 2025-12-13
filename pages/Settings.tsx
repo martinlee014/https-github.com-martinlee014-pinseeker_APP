@@ -1,12 +1,12 @@
 
 import { useContext, useEffect, useState } from 'react';
 import { AppContext } from '../App';
-import { BookOpen, Ruler, Briefcase, Download, Smartphone, Share, PlusSquare, Info, Map, MessageSquare, Send, X, Loader2 } from 'lucide-react';
+import { BookOpen, Ruler, Briefcase, Download, Smartphone, Share, PlusSquare, Info, Map, MessageSquare, Send, X, Loader2, HelpCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ModalOverlay } from '../components/Modals';
 
 const Settings = () => {
-  const { useYards, toggleUnits } = useContext(AppContext);
+  const { useYards, toggleUnits, setShowTutorial } = useContext(AppContext);
   const navigate = useNavigate();
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [showInstallHelp, setShowInstallHelp] = useState(false);
@@ -54,34 +54,46 @@ const Settings = () => {
     // User provided Formspree ID
     const FORMSPREE_ID = "mwpgyydb"; 
 
-    const payload = {
-        email: feedbackEmail || "Anonymous",
+    // Construct the payload
+    // We add _subject to make the dashboard easier to read
+    const payload: any = {
         message: feedbackText,
-        type: feedbackType,
+        category: feedbackType,
         timestamp: new Date().toLocaleString(),
-        device: navigator.userAgent
+        device: navigator.userAgent,
+        _subject: `PinSeeker Feedback: ${feedbackType}`
     };
+
+    // Strict Email Handling:
+    // Only attach the 'email' field if it is not empty and looks like an email.
+    // Sending "Anonymous" text in an 'email' field often causes Formspree to silently reject data.
+    if (feedbackEmail && feedbackEmail.includes('@')) {
+        payload.email = feedbackEmail;
+    }
 
     try {
         const response = await fetch(`https://formspree.io/f/${FORMSPREE_ID}`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Accept': 'application/json' // Explicitly tell Formspree we want JSON back
             },
             body: JSON.stringify(payload)
         });
 
         if (response.ok) {
-            alert("Feedback sent successfully! Thank you for helping us improve PinSeeker.");
+            alert("Feedback sent successfully! Check your Formspree dashboard (and Spam folder).");
             setShowFeedback(false);
             setFeedbackText('');
             setFeedbackEmail('');
             setFeedbackType('Suggestion');
         } else {
-            alert("Failed to send feedback. Please try again later.");
+            const data = await response.json();
+            console.error("Formspree Error:", data);
+            alert("Failed to send feedback. " + (data.error || "Please try again later."));
         }
     } catch (error) {
-        console.error("Feedback Error:", error);
+        console.error("Feedback Network Error:", error);
         alert("Network error. Please check your connection.");
     } finally {
         setIsSending(false);
@@ -158,6 +170,20 @@ const Settings = () => {
             <div className="text-gray-600 group-hover:text-white transition-colors">→</div>
         </button>
 
+        {/* Product Tour */}
+        <button 
+            onClick={() => setShowTutorial(true)}
+            className="w-full bg-gray-900 rounded-xl p-4 flex items-center gap-3 border border-gray-800 hover:bg-gray-800 transition-colors"
+        >
+            <div className="bg-gray-800 p-2 rounded-lg">
+                <HelpCircle className="text-purple-500" size={20} />
+            </div>
+            <div className="text-left flex-1">
+                <div className="font-medium text-white">Product Tour</div>
+                <div className="text-xs text-gray-500">View App Highlights</div>
+            </div>
+        </button>
+
         {/* Manual */}
         <button 
             onClick={() => navigate('/manual')}
@@ -188,7 +214,7 @@ const Settings = () => {
       </div>
       
       <div className="text-center text-xs text-gray-600 mt-10">
-          PinSeeker Web v7.9.2
+          PinSeeker Web v7.9.4
       </div>
 
       {showInstallHelp && (
@@ -272,7 +298,7 @@ const Settings = () => {
                             type="email"
                             value={feedbackEmail}
                             onChange={(e) => setFeedbackEmail(e.target.value)}
-                            placeholder="Leave blank to stay anonymous"
+                            placeholder="e.g. user@example.com (Optional)"
                             className="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-white outline-none focus:border-pink-500"
                         />
                     </div>

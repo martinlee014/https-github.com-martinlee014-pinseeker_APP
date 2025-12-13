@@ -4,6 +4,7 @@ import { HashRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'r
 import { User, LogOut, Play, Map as MapIcon, Settings as SettingsIcon } from 'lucide-react';
 import { StorageService } from './services/storage';
 import { ClubStats } from './types';
+import Onboarding from './components/Onboarding';
 
 // Pages
 import Login from './pages/Login';
@@ -25,6 +26,8 @@ export const AppContext = createContext<{
   toggleUnits: () => void;
   bag: ClubStats[];
   updateBag: (newBag: ClubStats[]) => void;
+  showTutorial: boolean;
+  setShowTutorial: (show: boolean) => void;
 }>({
   user: null,
   login: () => {},
@@ -33,6 +36,8 @@ export const AppContext = createContext<{
   toggleUnits: () => {},
   bag: [],
   updateBag: () => {},
+  showTutorial: false,
+  setShowTutorial: () => {},
 });
 
 const MainLayout = ({ children }: { children?: ReactNode }) => {
@@ -100,11 +105,15 @@ const App = () => {
   const [user, setUser] = useState<string | null>(StorageService.getCurrentUser());
   const [useYards, setUseYards] = useState<boolean>(StorageService.getUseYards());
   const [bag, setBag] = useState<ClubStats[]>([]);
+  const [showTutorial, setShowTutorial] = useState(false);
 
-  // Load bag on mount
+  // Load bag and check tutorial on mount
   useEffect(() => {
     setBag(StorageService.getBag());
-  }, []);
+    if (user && !StorageService.hasSeenOnboarding()) {
+        setShowTutorial(true);
+    }
+  }, [user]);
 
   const login = (username: string) => {
     setUser(username);
@@ -126,10 +135,16 @@ const App = () => {
     setBag(newBag);
     StorageService.saveBag(newBag);
   };
+  
+  const handleCloseTutorial = () => {
+      setShowTutorial(false);
+      StorageService.markOnboardingSeen();
+  };
 
   return (
-    <AppContext.Provider value={{ user, login, logout, useYards, toggleUnits, bag, updateBag }}>
+    <AppContext.Provider value={{ user, login, logout, useYards, toggleUnits, bag, updateBag, showTutorial, setShowTutorial }}>
       <HashRouter>
+        {showTutorial && <Onboarding onClose={handleCloseTutorial} />}
         <Routes>
           <Route path="/" element={user ? <Navigate to="/dashboard" /> : <Login />} />
           <Route path="/dashboard" element={<ProtectedRoute user={user}><MainLayout><Dashboard /></MainLayout></ProtectedRoute>} />

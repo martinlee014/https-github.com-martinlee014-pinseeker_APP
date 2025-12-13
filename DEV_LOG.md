@@ -1,6 +1,30 @@
 
 # PinSeeker Web - Development Log
 
+## Version: V7.9.4 (Product Tour & Docs)
+**Date:** 2024-05-31
+**Branch:** `main`
+**Status:** ✅ RELEASED
+
+### Features
+- **Immersive Onboarding**: Implemented a new 6-slide full-screen product tour for first-time users.
+  - **Visuals**: Features high-quality background images and CSS-based visual simulations (Dispersion, Wind Compass, Strategy Board) to instantly convey feature value.
+  - **Content**: Covers Dispersion Analysis, Advanced Rangefinder, Interactive Strategy, Course Editor, and Replay Analytics.
+- **Documentation Overhaul**: Completely rewrote `README.md` to better reflect the product's positioning as a "Smart Electronic Caddie". Added clear value propositions and target audience definitions.
+- **UX Improvements**:
+  - **Settings Integration**: Added a "Product Tour" button in the Settings menu to allow users to review the tutorial at any time.
+  - **State Tracking**: Added persistent storage logic (`KEY_HAS_SEEN_ONBOARDING`) to ensure the tour appears automatically only on the first launch.
+
+## Version: V7.9.3 (Feedback Integration)
+**Date:** 2024-05-30
+**Branch:** `main`
+**Status:** ✅ RELEASED
+
+### Features
+- **Formspree Integration**: Successfully integrated the live Formspree endpoint (`mwpgyydb`) for user feedback.
+  - **Payload Optimization**: Added `_subject` field for better dashboard organization and conditional logic to only send the `email` field if provided and valid.
+  - **Reliability**: Added `Accept: application/json` headers to ensure correct CORS and JSON response handling, preventing "Anonymous" spam rejection issues.
+
 ## Version: V7.9.2 (Navigation & Flow)
 **Date:** 2024-05-30
 **Branch:** `main`

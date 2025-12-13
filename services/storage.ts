@@ -7,6 +7,7 @@ const KEY_SETTINGS_UNIT = 'pinseeker_unit_system';
 const KEY_CLUB_BAG = 'pinseeker_club_bag';
 const KEY_CUSTOM_COURSES = 'pinseeker_custom_courses';
 const KEY_ANNOTATIONS = 'pinseeker_map_annotations';
+const KEY_HAS_SEEN_ONBOARDING = 'pinseeker_has_seen_v793_onboarding';
 
 export const StorageService = {
   getCurrentUser: (): string | null => {
@@ -27,6 +28,15 @@ export const StorageService = {
 
   setUseYards: (useYards: boolean) => {
     localStorage.setItem(KEY_SETTINGS_UNIT, useYards ? 'yards' : 'meters');
+  },
+
+  // --- Onboarding ---
+  hasSeenOnboarding: (): boolean => {
+    return localStorage.getItem(KEY_HAS_SEEN_ONBOARDING) === 'true';
+  },
+
+  markOnboardingSeen: () => {
+    localStorage.setItem(KEY_HAS_SEEN_ONBOARDING, 'true');
   },
 
   // --- Club Management ---
