@@ -51,33 +51,41 @@ const Settings = () => {
     
     setIsSending(true);
     
-    // -------------------------------------------------------------------------
-    // NOTE: In a real deployment, you would replace this block with an API call 
-    // to a service like EmailJS, Formspree, or your own backend.
-    // Target: Mypinseeker@gmail.com
-    // -------------------------------------------------------------------------
-    
+    // User provided Formspree ID
+    const FORMSPREE_ID = "mwpgyydb"; 
+
     const payload = {
-        to: "Mypinseeker@gmail.com",
-        subject: `PinSeeker Feedback: ${feedbackType}`,
-        from: feedbackEmail || "Anonymous User",
+        email: feedbackEmail || "Anonymous",
         message: feedbackText,
-        timestamp: new Date().toISOString()
+        type: feedbackType,
+        timestamp: new Date().toLocaleString(),
+        device: navigator.userAgent
     };
 
-    console.log("Sending Feedback Payload:", payload);
+    try {
+        const response = await fetch(`https://formspree.io/f/${FORMSPREE_ID}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
 
-    // Simulate Network Delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    setIsSending(false);
-    setShowFeedback(false);
-    setFeedbackText('');
-    setFeedbackEmail('');
-    setFeedbackType('Suggestion');
-    
-    // Success feedback to user
-    alert("Feedback sent successfully! Thank you for helping us improve PinSeeker.");
+        if (response.ok) {
+            alert("Feedback sent successfully! Thank you for helping us improve PinSeeker.");
+            setShowFeedback(false);
+            setFeedbackText('');
+            setFeedbackEmail('');
+            setFeedbackType('Suggestion');
+        } else {
+            alert("Failed to send feedback. Please try again later.");
+        }
+    } catch (error) {
+        console.error("Feedback Error:", error);
+        alert("Network error. Please check your connection.");
+    } finally {
+        setIsSending(false);
+    }
   };
 
   return (
@@ -180,7 +188,7 @@ const Settings = () => {
       </div>
       
       <div className="text-center text-xs text-gray-600 mt-10">
-          PinSeeker Web v7.9.0
+          PinSeeker Web v7.9.2
       </div>
 
       {showInstallHelp && (
@@ -238,7 +246,7 @@ const Settings = () => {
             </div>
             <div className="p-6 bg-gray-900 overflow-y-auto max-h-[70vh]">
                 <p className="text-sm text-gray-400 mb-6">
-                    Help us improve PinSeeker. Your feedback will be sent directly to the development team.
+                    Help us improve PinSeeker. Your feedback will be sent directly to the development team via Formspree.
                 </p>
                 
                 <div className="space-y-4">
