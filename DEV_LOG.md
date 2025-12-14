@@ -1,6 +1,25 @@
 
 # PinSeeker Web - Development Log
 
+## Version: V7.11.0 (Real-Time GPS & Precision)
+**Date:** 2024-06-02
+**Branch:** `main`
+**Status:** ✅ RELEASED
+
+### Features
+- **Zero-Latency GPS (Background Tracking)**: 
+  - Switched from single-request `getCurrentPosition` to continuous `watchPosition`.
+  - The GPS hardware now "warms up" as soon as the map loads, ensuring that when the user taps "Record Shot" or "GPS Tee", the coordinate is available instantly without the previous 2-5 second delay.
+- **Live Location Confidence**:
+  - Added a **Pulsing Blue Dot** on the map to show real-time user location relative to the course.
+  - Added a **Signal Strength Indicator** (Bars + Accuracy in meters) to the top header. Users can now see if their GPS lock is precise (Green/High) before recording a shot.
+- **Manual Measurement Correction**:
+  - In Measurement Mode, the start point (User Location) is now **draggable**.
+  - **Use Case**: If GPS is slightly off (e.g., under trees), the user can drag their "virtual self" to the correct spot (e.g., cart path edge) to get a perfect layup distance.
+- **UX Refinements**:
+  - Increased the touch target size for the draggable measurement handle (48x48px hit area) for easier grabbing.
+  - Added a safety guard to the map click handler: taps very close to the measurement start point are ignored to prevent accidentally moving the target line when trying to drag the start handle.
+
 ## Version: V7.10.0 (In-Game Tuning)
 **Date:** 2024-06-01
 **Branch:** `main`

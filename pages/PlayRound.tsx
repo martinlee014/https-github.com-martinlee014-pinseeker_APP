@@ -10,7 +10,7 @@ import * as MathUtils from '../services/mathUtils';
 import { ClubStats, HoleScore, ShotRecord, RoundHistory, LatLng, GolfCourse, MapAnnotation } from '../types';
 import ClubSelector from '../components/ClubSelector';
 import { ScoreModal, ShotConfirmModal, HoleSelectorModal, FullScorecardModal, ModalOverlay } from '../components/Modals';
-import { Flag, Wind, ChevronLeft, Grid, ListChecks, ArrowLeft, ArrowRight, ChevronDown, MapPin, Ruler, Trash2, PenTool, Type, Highlighter, X, Check, Eraser, Home } from 'lucide-react';
+import { Flag, Wind, ChevronLeft, Grid, ListChecks, ArrowLeft, ArrowRight, ChevronDown, MapPin, Ruler, Trash2, PenTool, Type, Highlighter, X, Check, Eraser, Home, Signal, SignalHigh, SignalLow, SignalMedium } from 'lucide-react';
 
 // --- Icons Setup ---
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -54,6 +54,37 @@ const measureTargetIcon = new L.DivIcon({
   iconAnchor: [10, 10]
 });
 
+// Draggable Start Point Icon for Measurement Mode - IMPROVED HIT AREA
+const draggableMeasureStartIcon = new L.DivIcon({
+  className: 'measure-start-drag',
+  html: `
+    <div style="
+      width: 48px; 
+      height: 48px; 
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: move;
+    ">
+      <div style="
+        width: 28px; 
+        height: 28px; 
+        background-color: white; 
+        border-radius: 50%; 
+        border: 5px solid #3b82f6; 
+        box-shadow: 0 0 15px rgba(59, 130, 246, 0.6), 0 4px 8px rgba(0,0,0,0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      ">
+        <div style="width: 8px; height: 8px; background-color: #3b82f6; border-radius: 50%;"></div>
+      </div>
+    </div>
+  `,
+  iconSize: [48, 48],
+  iconAnchor: [24, 24]
+});
+
 const startMarkerIcon = new L.DivIcon({
   className: 'custom-start-icon',
   html: `
@@ -77,6 +108,19 @@ const ballIcon = new L.DivIcon({
   `,
   iconSize: [14, 14],
   iconAnchor: [7, 7]
+});
+
+// Current User Location Icon (Pulsing Blue Dot)
+const userLocationIcon = new L.DivIcon({
+  className: 'user-location-icon',
+  html: `
+    <div class="relative flex items-center justify-center w-6 h-6">
+      <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+      <span class="relative inline-flex rounded-full h-4 w-4 bg-blue-500 border-2 border-white shadow-sm"></span>
+    </div>
+  `,
+  iconSize: [24, 24],
+  iconAnchor: [12, 12]
 });
 
 // Arrow Icon for Planning Mode
@@ -493,6 +537,12 @@ const PlayRound = () => {
   // --- Deletion State ---
   const [shotToDelete, setShotToDelete] = useState<ShotRecord | null>(null);
 
+  // --- GPS Tracking State (New) ---
+  const [liveLocation, setLiveLocation] = useState<LatLng | null>(null);
+  const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
+  const [gpsSignalLevel, setGpsSignalLevel] = useState<0 | 1 | 2 | 3>(0);
+  const watchIdRef = useRef<number | null>(null);
+
   // GPS Button Logic Refs
   const gpsPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isLongPressAction = useRef(false);
@@ -539,6 +589,40 @@ const PlayRound = () => {
         }
     }
   }, []);
+
+  // --- GPS WATCH IMPLEMENTATION ---
+  useEffect(() => {
+    if (isReplay || !navigator.geolocation) return;
+
+    // Start watching position immediately to "warm up" GPS
+    watchIdRef.current = navigator.geolocation.watchPosition(
+        (position) => {
+            const { latitude, longitude, accuracy } = position.coords;
+            setLiveLocation({ lat: latitude, lng: longitude });
+            setGpsAccuracy(accuracy);
+
+            // Determine rough signal level based on accuracy (meters)
+            if (accuracy <= 10) setGpsSignalLevel(3); // High
+            else if (accuracy <= 30) setGpsSignalLevel(2); // Med
+            else setGpsSignalLevel(1); // Low
+        },
+        (error) => {
+            console.warn("GPS Watch Error:", error);
+            setGpsSignalLevel(0);
+        },
+        {
+            enableHighAccuracy: true,
+            maximumAge: 2000, // Accept cached positions up to 2s old
+            timeout: 10000
+        }
+    );
+
+    return () => {
+        if (watchIdRef.current !== null) {
+            navigator.geolocation.clearWatch(watchIdRef.current);
+        }
+    };
+  }, [isReplay]);
 
   useEffect(() => {
       if (hole && shotNum === 1 && !pendingShot) {
@@ -652,7 +736,8 @@ const PlayRound = () => {
         // --- NEW LOGIC: Exclude Driver if not on Tee (ShotNum > 1) ---
         let validClubs = bag;
         if (shotNum > 1) {
-            validClubs = bag.filter(c => c.name !== 'Driver');
+            // Updated: Case-insensitive check to strictly exclude driver on non-tee shots
+            validClubs = bag.filter(c => !c.name.toLowerCase().includes('driver'));
         }
         
         // Find suitable club
@@ -667,7 +752,10 @@ const PlayRound = () => {
             suitable = currentLayupStrategy.club1;
         }
 
-        setSelectedClub(suitable || sortedValid[0]); 
+        const bestClub = suitable || sortedValid[0];
+        if (bestClub) {
+            setSelectedClub(bestClub);
+        }
       }
     }
   }, [currentBallPos, currentHoleIdx, isReplay, isMeasureMode, shotNum, distToGreen]);
@@ -676,14 +764,19 @@ const PlayRound = () => {
     // If we have a layup strategy recommendation because target is too far
     if (currentLayupStrategy && shotNum > 1 && bag.length > 1) {
         // Check if distance is truly far enough to warrant strategy display
-        const longestValid = bag.find(c => c.name !== 'Driver') || bag[0];
+        const longestValid = bag.find(c => !c.name.toLowerCase().includes('driver')) || bag[0];
         if (distToGreen > longestValid.carry + 10) {
            return `${currentLayupStrategy.club1.name} + ${currentLayupStrategy.club2.name}`;
         }
     }
 
     if (distLandingToGreen < 20) return "Putter";
-    const sorted = [...bag].sort((a,b) => a.carry - b.carry);
+
+    // For next shot suggestion, also filter out Driver (since next shot is definitely fairway/rough)
+    const validForNext = bag.filter(c => !c.name.toLowerCase().includes('driver'));
+    if (validForNext.length === 0) return "Club"; // Fallback if user only has driver
+
+    const sorted = [...validForNext].sort((a,b) => a.carry - b.carry);
     const match = sorted.find(c => c.carry >= distLandingToGreen);
     if (match) return match.name;
     return sorted[sorted.length-1].name;
@@ -711,6 +804,15 @@ const PlayRound = () => {
     }
     
     if (isMeasureMode) {
+        // SAFETY GUARD: Prevent accidental target setting when trying to drag the start point.
+        // If click is within ~5 meters of the start point, ignore it.
+        const clickPos = { lat: latlng.lat, lng: latlng.lng };
+        const distToStart = MathUtils.calculateDistance(currentBallPos, clickPos);
+        
+        if (distToStart < 5) {
+            return;
+        }
+
         setMeasureTarget({ lat: latlng.lat, lng: latlng.lng });
         return;
     }
@@ -867,21 +969,40 @@ const PlayRound = () => {
   };
 
   const initiateGPSShot = () => {
+    // IMPROVED: Use live location if available (from watchPosition) for zero latency
+    if (liveLocation && gpsAccuracy && gpsAccuracy < 50) {
+        const dist = MathUtils.calculateDistance(currentBallPos, liveLocation);
+        setPendingShot({ pos: liveLocation, isGPS: true, dist });
+        return;
+    }
+
+    // Fallback: Force a one-time get if watch isn't ready or stale (though watch is preferred)
     if (!navigator.geolocation) {
       alert("Geolocation not supported");
       return;
     }
+    
+    // UI feedback that we are forcing a location fetch
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const gpsPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         const dist = MathUtils.calculateDistance(currentBallPos, gpsPos);
         setPendingShot({ pos: gpsPos, isGPS: true, dist });
       },
-      (err) => alert("GPS Error: " + err.message)
+      (err) => alert("GPS Error: " + err.message),
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
     );
   };
 
   const setTeeToGPS = () => {
+    // IMPROVED: Use live location if available
+    if (liveLocation && gpsAccuracy && gpsAccuracy < 50) {
+        setCurrentBallPos(liveLocation);
+        if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
+        alert("Start position updated to current GPS location (Instant).");
+        return;
+    }
+
     if (!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition((pos) => {
       const gpsPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
@@ -892,6 +1013,13 @@ const PlayRound = () => {
   };
 
   const handleMeasureGPS = () => {
+      // IMPROVED: Use live location
+      if (liveLocation) {
+          setCurrentBallPos(liveLocation);
+          if (navigator.vibrate) navigator.vibrate(50);
+          return;
+      }
+
       if (!navigator.geolocation) {
           alert("Geolocation not supported");
           return;
@@ -1068,6 +1196,13 @@ const PlayRound = () => {
       setWindDir(Math.round(newDir));
   };
 
+  const getSignalIcon = () => {
+      if (gpsSignalLevel === 0) return <SignalLow size={14} className="text-red-500 animate-pulse" />;
+      if (gpsSignalLevel === 1) return <SignalMedium size={14} className="text-yellow-500" />;
+      if (gpsSignalLevel === 2) return <SignalHigh size={14} className="text-green-500" />;
+      return <Signal size={14} className="text-blue-500" />;
+  };
+
   return (
     <div className="h-full relative bg-gray-900 flex flex-col overflow-hidden">
       {/* Map Area */}
@@ -1096,6 +1231,12 @@ const PlayRound = () => {
               />
               <RotatedMapHandler rotation={mapRotation} onLongPress={handleManualDrop} onClick={handleMapClick} />
               <MapInitializer center={currentBallPos} isReplay={isReplay} pointsToFit={replayPoints} />
+              
+              {/* Live Location Marker (Blue Dot) */}
+              {!isReplay && liveLocation && (
+                  <Marker position={[liveLocation.lat, liveLocation.lng]} icon={userLocationIcon} zIndexOffset={1000} interactive={false} />
+              )}
+
               <Marker position={[hole.green.lat, hole.green.lng]} icon={flagIcon} />
               
               {/* User Annotations */}
@@ -1205,7 +1346,20 @@ const PlayRound = () => {
               {/* Measurement Mode Visuals */}
               {!isReplay && isMeasureMode && activeMeasureTarget && (
                   <>
-                      <Marker position={[currentBallPos.lat, currentBallPos.lng]} icon={ballIcon} interactive={false} />
+                      <Marker 
+                        position={[currentBallPos.lat, currentBallPos.lng]} 
+                        icon={draggableMeasureStartIcon} 
+                        draggable={true}
+                        eventHandlers={{
+                            dragend: (e) => {
+                                const marker = e.target;
+                                const pos = marker.getLatLng();
+                                setCurrentBallPos({ lat: pos.lat, lng: pos.lng });
+                                if (navigator.vibrate) navigator.vibrate(20);
+                            }
+                        }}
+                        zIndexOffset={1000}
+                      />
                       <Marker position={[activeMeasureTarget.lat, activeMeasureTarget.lng]} icon={measureTargetIcon} interactive={false} />
                       <Polyline positions={[[currentBallPos.lat, currentBallPos.lng], [activeMeasureTarget.lat, activeMeasureTarget.lng]]} pathOptions={{ color: "#60a5fa", weight: 4, opacity: 1 }} interactive={false} />
                       <Polyline positions={[[activeMeasureTarget.lat, activeMeasureTarget.lng], [hole.green.lat, hole.green.lng]]} pathOptions={{ color: "#ffffff", weight: 3, dashArray: "8, 8", opacity: 0.8 }} interactive={false} />
@@ -1232,6 +1386,18 @@ const PlayRound = () => {
         </div>
 
         <div className="text-center mt-1 drop-shadow-lg pointer-events-none">
+          <div className="flex items-center justify-center gap-1.5 mb-1 opacity-80">
+            {isReplay ? (
+                <span className="text-[10px] text-gray-400 bg-black/60 px-2 rounded-md">REPLAY</span>
+            ) : (
+                <div className="flex items-center gap-1 bg-black/60 px-2 py-0.5 rounded-md backdrop-blur-md">
+                   {getSignalIcon()}
+                   <span className="text-[10px] font-mono text-gray-300">
+                       {gpsAccuracy ? `±${Math.round(gpsAccuracy)}m` : 'NO GPS'}
+                   </span>
+                </div>
+            )}
+          </div>
           <h2 className="text-2xl font-black text-white drop-shadow-md">HOLE {hole.number}</h2>
           <div className="flex items-center justify-center gap-2 text-xs font-bold bg-black/60 rounded-full px-3 py-1 backdrop-blur-md inline-flex border border-white/10 shadow-lg">
             <span className="text-gray-300">PAR {hole.par}</span><span className="text-gray-500">|</span><span className="text-white">{MathUtils.formatDistance(distToGreen, useYards)}</span>

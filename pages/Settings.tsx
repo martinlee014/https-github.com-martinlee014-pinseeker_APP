@@ -214,7 +214,7 @@ const Settings = () => {
       </div>
       
       <div className="text-center text-xs text-gray-600 mt-10">
-          PinSeeker Web v7.9.4
+          PinSeeker Web v7.11.0
       </div>
 
       {showInstallHelp && (

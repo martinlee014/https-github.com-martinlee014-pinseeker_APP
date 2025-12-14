@@ -164,11 +164,12 @@ export const calculateLayupStrategy = (
   // If shot > 1 (fairway/rough), exclude Driver (and maybe Putter)
   let validClubs1 = bag;
   if (shotNum > 1) {
-      validClubs1 = bag.filter(c => c.name !== 'Driver' && c.name !== 'Putter');
+      // Case-insensitive check
+      validClubs1 = bag.filter(c => !c.name.toLowerCase().includes('driver') && !c.name.toLowerCase().includes('putter'));
   }
 
   // 2. Filter valid clubs for second shot (usually anything except Driver)
-  const validClubs2 = bag.filter(c => c.name !== 'Driver');
+  const validClubs2 = bag.filter(c => !c.name.toLowerCase().includes('driver'));
 
   let bestPair = null;
   // We initialize with a high "badness" score.
