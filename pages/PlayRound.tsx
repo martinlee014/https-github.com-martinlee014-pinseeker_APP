@@ -216,7 +216,8 @@ const RotatedMapHandler = ({
         const dy = clientPos.y - cy;
 
         // Undo Scale
-        const scale = 1.4;
+        // Fixed: Scale is now 1 because we size the container to 150vmax instead of scaling it.
+        const scale = 1;
         const unscaledDx = dx / scale;
         const unscaledDy = dy / scale;
 
@@ -383,12 +384,21 @@ const RotatedMapHandler = ({
 const MapInitializer = ({ center, isReplay, pointsToFit }: { center: LatLng, isReplay: boolean, pointsToFit?: LatLng[] }) => {
     const map = useMap();
     
-    // Fix: Force Leaflet to recalculate container size after mount to prevent partial tile loading
+    // Fix: Force Leaflet to recalculate container size after mount or resize
     useEffect(() => {
+        const resizeObserver = new ResizeObserver(() => {
+            map.invalidateSize();
+        });
+        resizeObserver.observe(map.getContainer());
+
         const timer = setTimeout(() => {
             map.invalidateSize();
         }, 250);
-        return () => clearTimeout(timer);
+        
+        return () => {
+            clearTimeout(timer);
+            resizeObserver.disconnect();
+        };
     }, [map]);
 
     useEffect(() => {
@@ -990,8 +1000,15 @@ const PlayRound = () => {
   return (
     <div className="h-full relative bg-gray-900 flex flex-col overflow-hidden">
       {/* Map Area */}
-      <div className="absolute inset-0 z-0 bg-black w-full h-full">
-        <div style={{ width: '100%', height: '100%', transform: `rotate(${mapRotation}deg) scale(1.4)`, transition: 'transform 0.8s cubic-bezier(0.4, 0, 0.2, 1)' }}>
+      <div className="absolute inset-0 z-0 bg-black w-full h-full overflow-hidden flex items-center justify-center">
+        {/* Fixed: Use large sizing instead of scaling to ensure coverage of corners when rotated on all aspect ratios */}
+        <div style={{ 
+            width: '150vmax', 
+            height: '150vmax', 
+            transform: `rotate(${mapRotation}deg)`, 
+            transition: 'transform 0.8s cubic-bezier(0.4, 0, 0.2, 1)',
+            willChange: 'transform'
+        }}>
             <MapContainer key={`${activeCourse.id}-${currentHoleIdx}`} center={[hole.tee.lat, hole.tee.lng]} zoom={18} className="h-full w-full bg-black" zoomControl={false} attributionControl={false} dragging={false} doubleClickZoom={false}>
               <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" />
               <RotatedMapHandler rotation={mapRotation} onLongPress={handleManualDrop} onClick={handleMapClick} />
