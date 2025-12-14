@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -29,6 +30,17 @@
       }
       .leaflet-container {
         background: #000;
+      }
+      /* Prevent long-press save image popup on iOS/Android */
+      img, svg {
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+        pointer-events: auto; /* Allow events unless explicitly disabled */
+      }
+      /* Leaflet specific fix for vectors */
+      .leaflet-overlay-pane svg {
+          -webkit-touch-callout: none;
       }
     </style>
 <script type="importmap">
