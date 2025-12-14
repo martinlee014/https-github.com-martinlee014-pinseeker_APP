@@ -1,15 +1,20 @@
+
 import { useState, useContext, useEffect, useRef } from 'react';
 import { AppContext } from '../App';
 import { ClubStats } from '../types';
 import { ChevronLeft, Plus, Trash2, Save, X, Edit3, RotateCcw } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { StorageService } from '../services/storage';
 
 const ClubManagement = () => {
   const { bag, updateBag, useYards } = useContext(AppContext);
   const navigate = useNavigate();
+  const location = useLocation();
   const [editingClub, setEditingClub] = useState<ClubStats | null>(null);
   const [isNew, setIsNew] = useState(false);
+
+  // Check if we came from an active game
+  const fromGame = location.state?.fromGame;
 
   // Form State
   const [name, setName] = useState('');
@@ -24,6 +29,15 @@ const ClubManagement = () => {
     setCarry(club.carry);
     setSideError(club.sideError);
     setDepthError(club.depthError);
+  };
+
+  const handleBack = () => {
+      if (fromGame) {
+          // IMPORTANT: Return to play mode and signal to restore state
+          navigate('/play?restore=true');
+      } else {
+          navigate(-1);
+      }
   };
 
   const handleSave = () => {
@@ -245,10 +259,10 @@ const ClubManagement = () => {
   return (
     <div className="p-4 flex flex-col h-full">
       <div className="flex items-center justify-between mb-6">
-        <button onClick={() => navigate(-1)} className="p-2 bg-gray-800 rounded-lg">
+        <button onClick={handleBack} className="p-2 bg-gray-800 rounded-lg">
           <ChevronLeft className="text-white" />
         </button>
-        <h1 className="text-2xl font-bold text-white">My Bag</h1>
+        <h1 className="text-2xl font-bold text-white">{fromGame ? 'Edit Bag (In Game)' : 'My Bag'}</h1>
         <button onClick={handleReset} className="p-2 bg-gray-800 rounded-lg text-gray-400 hover:text-white">
            <RotateCcw size={20} />
         </button>

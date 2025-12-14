@@ -1,5 +1,6 @@
-import { useState, ReactNode, ChangeEvent } from 'react';
-import { X, Check, AlertTriangle, MapPin, Trophy, Flag, Target } from 'lucide-react';
+
+import { useState, ReactNode, ChangeEvent, useEffect } from 'react';
+import { X, Check, AlertTriangle, MapPin, Trophy, Flag, Target, Minus, Plus } from 'lucide-react';
 import { ClubStats, GolfHole, HoleScore } from '../types';
 
 export const ModalOverlay = ({ children, onClose }: { children?: ReactNode, onClose?: () => void }) => (
@@ -26,24 +27,58 @@ export const ModalOverlay = ({ children, onClose }: { children?: ReactNode, onCl
 export const ScoreModal = ({ 
   par, 
   holeNum, 
+  recordedShots,
   onSave, 
   onClose 
 }: { 
   par: number, 
   holeNum: number, 
-  onSave: (putts: number, pens: number) => void, 
+  recordedShots: number,
+  onSave: (totalScore: number, putts: number, pens: number) => void, 
   onClose: () => void 
 }) => {
+  // Default values
   const [putts, setPutts] = useState(2);
   const [pens, setPens] = useState(0);
+  // Total Score defaults to (Recorded Shots + Putts + Pens), but at least Par (just for UX niceness)
+  const [totalScore, setTotalScore] = useState(Math.max(par, recordedShots + 2 + 0));
 
-  const Stepper = ({ label, val, setVal }: any) => (
-    <div className="flex items-center justify-between bg-gray-800 p-3 rounded-xl mb-3">
+  // Smart Sync Logic:
+  // If user changes putts or penalties, we assume the total score increases/decreases too.
+  // But user can also modify Total Score independently (to account for missed GPS shots).
+
+  const handlePuttChange = (delta: number) => {
+      const newPutts = Math.max(0, putts + delta);
+      const diff = newPutts - putts;
+      setPutts(newPutts);
+      setTotalScore(prev => Math.max(1, prev + diff));
+  };
+
+  const handlePenChange = (delta: number) => {
+      const newPens = Math.max(0, pens + delta);
+      const diff = newPens - pens;
+      setPens(newPens);
+      setTotalScore(prev => Math.max(1, prev + diff));
+  };
+
+  const handleTotalChange = (delta: number) => {
+      // Ensure Total Score never drops below (Putts + Pens)
+      // Because you can't have a score of 3 if you had 4 putts.
+      const minScore = putts + pens + 1; // At least 1 shot to reach green theoretically (or 0 if driven green? let's stick to safe logic)
+      setTotalScore(prev => Math.max(minScore, prev + delta));
+  };
+
+  const Stepper = ({ label, val, onChange, color = "bg-gray-700" }: any) => (
+    <div className="flex items-center justify-between bg-gray-800 p-3 rounded-xl mb-3 border border-gray-700">
       <span className="text-gray-300 font-bold">{label}</span>
       <div className="flex items-center gap-4">
-        <button type="button" onClick={() => setVal(Math.max(0, val - 1))} className="w-8 h-8 rounded-full bg-gray-700 text-white font-bold">-</button>
-        <span className="w-6 text-center text-xl font-bold text-white">{val}</span>
-        <button type="button" onClick={() => setVal(val + 1)} className="w-8 h-8 rounded-full bg-green-600 text-white font-bold">+</button>
+        <button type="button" onClick={() => onChange(-1)} className={`w-10 h-10 rounded-xl ${color} text-white font-bold flex items-center justify-center hover:brightness-110 active:scale-95 transition-all`}>
+            <Minus size={18} />
+        </button>
+        <span className="w-8 text-center text-xl font-bold text-white">{val}</span>
+        <button type="button" onClick={() => onChange(1)} className={`w-10 h-10 rounded-xl ${color} text-white font-bold flex items-center justify-center hover:brightness-110 active:scale-95 transition-all`}>
+            <Plus size={18} />
+        </button>
       </div>
     </div>
   );
@@ -51,23 +86,49 @@ export const ScoreModal = ({
   return (
     <ModalOverlay onClose={onClose}>
       <div className="p-4 border-b border-gray-800 flex justify-between items-center bg-gray-800/50 shrink-0">
-        <h3 className="text-lg font-bold text-white">Finish Hole {holeNum}</h3>
+        <h3 className="text-lg font-bold text-white">Hole {holeNum} Result</h3>
         <button type="button" onClick={onClose}><X className="text-gray-400" /></button>
       </div>
+      
       <div className="p-6 overflow-y-auto">
-        <div className="text-center mb-6">
-          <span className="text-4xl font-black text-white">{par + (putts - 2) + pens}</span> {/* Rough estimate */}
-          <div className="text-gray-500 text-xs uppercase tracking-widest mt-1">Total Score (Est)</div>
+        {/* Main Score Editor */}
+        <div className="text-center mb-8 bg-gray-800/50 p-4 rounded-2xl border border-gray-700 relative">
+            <div className="text-gray-500 text-xs font-bold uppercase tracking-widest mb-2">Total Score</div>
+            
+            <div className="flex items-center justify-center gap-6">
+                <button onClick={() => handleTotalChange(-1)} className="w-12 h-12 rounded-full bg-gray-700 text-white flex items-center justify-center hover:bg-gray-600 active:scale-95 transition-all">
+                    <Minus size={24}/>
+                </button>
+                <span className={`text-6xl font-black ${totalScore < par ? 'text-red-500' : totalScore > par ? 'text-blue-500' : 'text-white'}`}>
+                    {totalScore}
+                </span>
+                <button onClick={() => handleTotalChange(1)} className="w-12 h-12 rounded-full bg-green-600 text-white flex items-center justify-center hover:bg-green-500 active:scale-95 transition-all shadow-lg shadow-green-900/50">
+                    <Plus size={24}/>
+                </button>
+            </div>
+            <div className="mt-2 text-sm text-gray-400">
+                Par {par}
+            </div>
         </div>
-        <Stepper label="Putts" val={putts} setVal={setPutts} />
-        <Stepper label="Penalties" val={pens} setVal={setPens} />
+
+        {/* Detailed Breakdown */}
+        <div className="space-y-1">
+            <Stepper label="Putts" val={putts} onChange={handlePuttChange} />
+            <Stepper label="Penalties" val={pens} onChange={handlePenChange} color="bg-red-900/40" />
+        </div>
+        
+        <div className="bg-blue-900/20 p-3 rounded-lg border border-blue-500/20 mb-4 mt-4">
+            <p className="text-xs text-blue-300 text-center">
+                Calculated Shots to Green: <span className="font-bold text-white text-sm">{Math.max(0, totalScore - putts - pens)}</span>
+            </p>
+        </div>
         
         <button 
           type="button"
-          onClick={() => onSave(putts, pens)}
-          className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-xl mt-4 flex items-center justify-center gap-2"
+          onClick={() => onSave(totalScore, putts, pens)}
+          className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 shadow-lg transition-transform active:scale-95"
         >
-          <Check size={20} /> Save Score
+          <Check size={20} /> Save Scorecard
         </button>
       </div>
     </ModalOverlay>

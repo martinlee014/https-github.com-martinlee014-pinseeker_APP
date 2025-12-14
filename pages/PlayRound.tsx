@@ -175,6 +175,30 @@ const createAnnotationTextIcon = (text: string, rotation: number) => new L.DivIc
   iconAnchor: [0, 24] // Anchor at the bottom dot
 });
 
+// Custom Golf Bag Icon Component
+const GolfBagIcon = ({ size = 24, className = "" }: { size?: number, className?: string }) => (
+  <svg 
+    xmlns="http://www.w3.org/2000/svg" 
+    width={size} 
+    height={size} 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    stroke="currentColor" 
+    strokeWidth="2" 
+    strokeLinecap="round" 
+    strokeLinejoin="round" 
+    className={className}
+  >
+    <path d="M7 6h10v14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V6z" />
+    <path d="M9 6V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3" />
+    <path d="M9 4l-2 2" />
+    <path d="M15 4l2 2" />
+    <path d="M17 10l2 2a2 2 0 0 1 0 3l-2 2" />
+    <path d="M10 12h4" />
+    <path d="M10 16h4" />
+  </svg>
+);
+
 // RotatedMapHandler: Handles Pan, Click, and Long Press with CSS Transform correction
 const RotatedMapHandler = ({ 
     rotation, 
@@ -533,10 +557,20 @@ const PlayRound = () => {
     }
   }, [currentHoleIdx, activeCourse]);
 
+  // Updated: Sync active club stats when bag changes (e.g. returning from editing)
   useEffect(() => {
     if (bag.length > 0) {
-      const exists = bag.find(c => c.name === selectedClub.name);
-      if (!exists) setSelectedClub(bag[0]);
+      // Find the currently selected club in the new bag
+      const updatedClub = bag.find(c => c.name === selectedClub.name);
+      
+      if (updatedClub) {
+          // If the stats have changed (or object ref changed), update selectedClub
+          // This ensures new carry distances apply immediately
+          setSelectedClub(updatedClub);
+      } else {
+          // If the club was deleted, default to the first one
+          setSelectedClub(bag[0]);
+      }
     }
   }, [bag]);
 
@@ -604,25 +638,56 @@ const PlayRound = () => {
       lng: (activeMeasureTarget.lng + hole.green.lng) / 2
   }), [activeMeasureTarget, hole]);
 
+  const currentLayupStrategy = useMemo(() => {
+    return MathUtils.calculateLayupStrategy(distToGreen, bag, shotNum);
+  }, [distToGreen, bag, shotNum]);
+
   useEffect(() => {
     if (!isReplay && bag.length > 0 && !isMeasureMode) {
       const dist = distToGreen;
+      
       if (dist < 50) {
         setSelectedClub(bag[bag.length - 1]); 
       } else {
-        const suitable = [...bag].reverse().find(c => c.carry >= dist - 10);
-        setSelectedClub(suitable || bag[0]); 
+        // --- NEW LOGIC: Exclude Driver if not on Tee (ShotNum > 1) ---
+        let validClubs = bag;
+        if (shotNum > 1) {
+            validClubs = bag.filter(c => c.name !== 'Driver');
+        }
+        
+        // Find suitable club
+        // Bag is sorted Longest to Shortest (Driver -> Putter)
+        // Reverse to search Shortest -> Longest
+        const sortedValid = [...validClubs].sort((a,b) => b.carry - a.carry);
+        let suitable = [...sortedValid].reverse().find(c => c.carry >= dist - 10);
+        
+        // If no club reaches, check for layup strategy
+        if (!suitable && currentLayupStrategy) {
+            // Auto-select the first club of the optimal layup pair
+            suitable = currentLayupStrategy.club1;
+        }
+
+        setSelectedClub(suitable || sortedValid[0]); 
       }
     }
-  }, [currentBallPos, currentHoleIdx, isReplay, isMeasureMode]);
+  }, [currentBallPos, currentHoleIdx, isReplay, isMeasureMode, shotNum, distToGreen]);
 
   const nextClubSuggestion = useMemo(() => {
+    // If we have a layup strategy recommendation because target is too far
+    if (currentLayupStrategy && shotNum > 1 && bag.length > 1) {
+        // Check if distance is truly far enough to warrant strategy display
+        const longestValid = bag.find(c => c.name !== 'Driver') || bag[0];
+        if (distToGreen > longestValid.carry + 10) {
+           return `${currentLayupStrategy.club1.name} + ${currentLayupStrategy.club2.name}`;
+        }
+    }
+
     if (distLandingToGreen < 20) return "Putter";
     const sorted = [...bag].sort((a,b) => a.carry - b.carry);
     const match = sorted.find(c => c.carry >= distLandingToGreen);
     if (match) return match.name;
     return sorted[sorted.length-1].name;
-  }, [distLandingToGreen, bag]);
+  }, [distLandingToGreen, bag, currentLayupStrategy, distToGreen, shotNum]);
 
   const handleMapClick = (latlng: any) => {
     if (isReplay) return;
@@ -905,12 +970,18 @@ const PlayRound = () => {
     setShotToDelete(null);
   };
 
-  const saveHoleScore = (putts: number, pens: number) => {
-    const shotsTaken = shotNum - 1; 
+  const saveHoleScore = (totalScore: number, putts: number, pens: number) => {
+    // We now receive the confirmed Total Score from the user.
+    // The data model stores 'shotsTaken' which typically means shots to reach/hole-out on green.
+    // Score = shotsTaken + putts + penalties.
+    // Therefore: shotsTaken = Score - putts - penalties.
+    
+    const shotsTaken = Math.max(0, totalScore - putts - pens);
+
     const newScore: HoleScore = {
       holeNumber: hole.number,
       par: hole.par,
-      shotsTaken: Math.max(0, shotsTaken),
+      shotsTaken: shotsTaken,
       putts,
       penalties: pens
     };
@@ -1000,17 +1071,29 @@ const PlayRound = () => {
   return (
     <div className="h-full relative bg-gray-900 flex flex-col overflow-hidden">
       {/* Map Area */}
-      <div className="absolute inset-0 z-0 bg-black w-full h-full overflow-hidden flex items-center justify-center">
+      <div className="absolute inset-0 z-0 bg-black w-full h-full overflow-hidden">
         {/* Fixed: Use large sizing instead of scaling to ensure coverage of corners when rotated on all aspect ratios */}
         <div style={{ 
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
             width: '150vmax', 
             height: '150vmax', 
-            transform: `rotate(${mapRotation}deg)`, 
+            transformOrigin: 'center center',
+            transform: `translate(-50%, -50%) rotate(${mapRotation}deg)`, 
             transition: 'transform 0.8s cubic-bezier(0.4, 0, 0.2, 1)',
             willChange: 'transform'
         }}>
-            <MapContainer key={`${activeCourse.id}-${currentHoleIdx}`} center={[hole.tee.lat, hole.tee.lng]} zoom={18} className="h-full w-full bg-black" zoomControl={false} attributionControl={false} dragging={false} doubleClickZoom={false}>
-              <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" />
+            <MapContainer key={`${activeCourse.id}-${currentHoleIdx}`} center={[hole.tee.lat, hole.tee.lng]} zoom={18} maxZoom={22} className="h-full w-full bg-black" zoomControl={false} attributionControl={false} dragging={false} doubleClickZoom={false}>
+              <TileLayer 
+                url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" 
+                maxNativeZoom={19}
+                maxZoom={22}
+                keepBuffer={20}
+                updateWhenIdle={false}
+                updateWhenZooming={false}
+                noWrap={true}
+              />
               <RotatedMapHandler rotation={mapRotation} onLongPress={handleManualDrop} onClick={handleMapClick} />
               <MapInitializer center={currentBallPos} isReplay={isReplay} pointsToFit={replayPoints} />
               <Marker position={[hole.green.lat, hole.green.lng]} icon={flagIcon} />
@@ -1141,6 +1224,7 @@ const PlayRound = () => {
            <button onClick={() => navigate('/dashboard')} className="bg-black/50 p-2 rounded-full text-white backdrop-blur-md border border-white/5 hover:bg-black/70 transition-colors"><Home size={20} /></button>
            {!isReplay && (
             <>
+             <button onClick={() => navigate('/settings/clubs', { state: { fromGame: true } })} className="bg-black/50 p-2 rounded-full text-white backdrop-blur-md border border-white/5 mt-1 hover:bg-black/70"><GolfBagIcon size={20} /></button>
              <button onClick={() => setShowHoleSelect(true)} className="bg-black/50 p-2 rounded-full text-white backdrop-blur-md border border-white/5 mt-1 hover:bg-black/70"><Grid size={20} /></button>
              <button onClick={() => setShowFullCard(true)} className="bg-black/50 p-2 rounded-full text-white backdrop-blur-md border border-white/5 mt-1 hover:bg-black/70"><ListChecks size={20} /></button>
             </>
@@ -1336,7 +1420,7 @@ const PlayRound = () => {
                                     <span className="text-[9px] text-gray-500 uppercase font-bold tracking-widest mb-0.5">Leaves</span>
                                     <div className="text-xl font-bold text-white leading-none">{MathUtils.formatDistance(distLandingToGreen, useYards)}</div>
                                     <div className="text-[10px] text-gray-500 mt-1 text-right truncate w-full">
-                                        Rec: <span className="text-white font-medium">{nextClubSuggestion}</span>
+                                        <span className="text-white font-medium">{nextClubSuggestion}</span>
                                     </div>
                                 </div>
                             </div>
@@ -1365,7 +1449,7 @@ const PlayRound = () => {
       )}
 
       {showHoleSelect && <HoleSelectorModal holes={activeCourse.holes} currentIdx={currentHoleIdx} onSelect={loadHole} onClose={() => setShowHoleSelect(false)} />}
-      {showScoreModal && <ScoreModal par={hole.par} holeNum={hole.number} onSave={saveHoleScore} onClose={() => setShowScoreModal(false)} />}
+      {showScoreModal && <ScoreModal par={hole.par} holeNum={hole.number} recordedShots={Math.max(0, shotNum - 1)} onSave={saveHoleScore} onClose={() => setShowScoreModal(false)} />}
       {showFullCard && <FullScorecardModal holes={activeCourse.holes} scorecard={scorecard} onFinishRound={finishRound} onClose={() => setShowFullCard(false)} />}
       {pendingShot && <ShotConfirmModal dist={MathUtils.formatDistance(pendingShot.dist, useYards)} club={selectedClub} clubs={bag} isGPS={pendingShot.isGPS} isLongDistWarning={pendingShot.dist > 500} onChangeClub={setSelectedClub} onConfirm={confirmShot} onCancel={() => setPendingShot(null)} />}
       {shotToDelete && (

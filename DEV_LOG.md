@@ -1,6 +1,21 @@
 
 # PinSeeker Web - Development Log
 
+## Version: V7.10.0 (In-Game Tuning)
+**Date:** 2024-06-01
+**Branch:** `main`
+**Status:** ✅ RELEASED
+
+### Features
+- **In-Game Equipment Adjustments**: Players can now access the "Club Management" screen directly from the active round toolbar (Top Left).
+  - **Use Case**: Realized your Driver carry is set too high mid-round? Fix it instantly without quitting the game.
+- **Smart State Restoration**:
+  - The app now tracks the navigation source. Returning from Club Settings while in a game sends the user back to the *exact* hole and shot position, preserving all temporary data (GPS measurement, wind settings, etc.).
+- **Live Data Synchronization**:
+  - Updates made to club statistics (Carry, Side/Depth Error) are immediately reflected in the Shot Planner (Dispersion Ellipse) upon returning to the game.
+- **Visual Polish**:
+  - Replaced generic icons with a custom-designed **SVG Golf Bag** icon for better semantic context in the game toolbar.
+
 ## Version: V7.9.4 (Product Tour & Docs)
 **Date:** 2024-05-31
 **Branch:** `main`

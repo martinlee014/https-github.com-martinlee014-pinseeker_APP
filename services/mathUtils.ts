@@ -1,3 +1,4 @@
+
 import { LatLng, ClubStats } from '../types';
 
 const EARTH_RADIUS = 6378137.0; // Meters
@@ -147,10 +148,66 @@ export const formatDistance = (meters: number, useYards: boolean): string => {
   return `${Math.round(meters)}m`;
 };
 
+// --- STRATEGY ALGORITHMS ---
+
+/**
+ * Calculates the optimal two-shot strategy to reach a target.
+ * It favors combinations that minimize total side error (dispersion).
+ */
+export const calculateLayupStrategy = (
+  distanceToGreen: number,
+  bag: ClubStats[],
+  shotNum: number
+): { club1: ClubStats; club2: ClubStats; totalSideError: number } | null => {
+  
+  // 1. Filter valid clubs for the first shot
+  // If shot > 1 (fairway/rough), exclude Driver (and maybe Putter)
+  let validClubs1 = bag;
+  if (shotNum > 1) {
+      validClubs1 = bag.filter(c => c.name !== 'Driver' && c.name !== 'Putter');
+  }
+
+  // 2. Filter valid clubs for second shot (usually anything except Driver)
+  const validClubs2 = bag.filter(c => c.name !== 'Driver');
+
+  let bestPair = null;
+  // We initialize with a high "badness" score.
+  // Badness = Total Side Error (Risk) + Weight * Excess Distance (we don't want to fly the green too much)
+  let minRiskScore = Infinity;
+
+  // 3. Iterate all pairs
+  for (const c1 of validClubs1) {
+      for (const c2 of validClubs2) {
+          const totalCarry = c1.carry + c2.carry;
+          
+          // Must reach the green (with a small tolerance, e.g., -5m is okay if it rolls)
+          if (totalCarry >= distanceToGreen - 5) {
+             
+             // Metric: Total Side Dispersion (Width)
+             // We want the tightest combined dispersion.
+             const totalSideError = c1.sideError + c2.sideError;
+             
+             // We can also penalize if the total carry is WAY over the green (uncontrolled)
+             // But usually you just club down on the second shot. 
+             // Let's assume the user hits a full shot for C1 and a controlled shot for C2.
+             // So we primarily optimize for lowest combined side error.
+             
+             if (totalSideError < minRiskScore) {
+                 minRiskScore = totalSideError;
+                 bestPair = { club1: c1, club2: c2, totalSideError };
+             }
+          }
+      }
+  }
+
+  return bestPair;
+};
+
 export const getStrategyRecommendation = (
   distanceToGreen: number, 
   bag: ClubStats[], 
-  useYards: boolean
+  useYards: boolean,
+  shotNum: number = 1
 ): { mainAction: string; subAction?: string } => {
   const unit = useYards ? 'yd' : 'm';
   const val = useYards ? distanceToGreen * 1.09361 : distanceToGreen;
@@ -165,7 +222,15 @@ export const getStrategyRecommendation = (
   if (distanceToGreen >= 80 && distanceToGreen <= 110) {
       return { mainAction: "Perfect Layup", subAction: `Leaves full wedge (${dist}${unit})` };
   }
-  if (distanceToGreen > 220) {
+  
+  // Check for layup strategy if distance is very long
+  // We use a simplified check here, the caller usually handles the specific club names
+  const maxCarry = bag[0].carry;
+  if (shotNum > 1 && distanceToGreen > maxCarry) {
+      return { mainAction: "Layup Required", subAction: "Check recommended combo" };
+  }
+
+  if (shotNum === 1 && distanceToGreen > 220) {
       return { mainAction: "Safe Drive", subAction: "Focus on fairway hit" };
   }
   
