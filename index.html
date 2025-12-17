@@ -31,22 +31,36 @@
       .leaflet-container {
         background: #000;
       }
-      /* Prevent long-press save image popup on iOS/Android */
+
+      /* CRITICAL: Aggressive suppression of mobile long-press context menus */
       * {
-        -webkit-touch-callout: none;
-        -webkit-user-select: none;
-        user-select: none;
+        -webkit-touch-callout: none !important;
+        -webkit-user-select: none !important;
+        -khtml-user-select: none !important;
+        -moz-user-select: none !important;
+        -ms-user-select: none !important;
+        user-select: none !important;
+        /* Prevent long press context menu on Android Chrome */
+        -webkit-tap-highlight-color: transparent;
       }
+
+      /* Specific rules for images and links which are prone to "Save Image" popups */
+      img, svg, a, .leaflet-tile {
+        -webkit-touch-callout: none !important;
+        -webkit-user-drag: none !important;
+        user-drag: none !important;
+        pointer-events: auto; /* Allow clicks, but deny callouts */
+      }
+
       input, textarea {
-        -webkit-user-select: text;
-        user-select: text;
+        -webkit-user-select: text !important;
+        user-select: text !important;
+        -webkit-touch-callout: default !important;
       }
-      img, svg {
-        pointer-events: auto; /* Allow events unless explicitly disabled */
-      }
+
       /* Leaflet specific fix for vectors */
       .leaflet-overlay-pane svg {
-          -webkit-touch-callout: none;
+          -webkit-touch-callout: none !important;
       }
     </style>
 <script type="importmap">

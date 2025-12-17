@@ -1,5 +1,5 @@
 
-import { useContext, useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { AppContext } from '../App';
 import { BookOpen, Ruler, Briefcase, Download, Smartphone, Share, PlusSquare, Info, Map, MessageSquare, Send, X, Loader2, HelpCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -51,11 +51,8 @@ const Settings = () => {
     
     setIsSending(true);
     
-    // User provided Formspree ID
     const FORMSPREE_ID = "mwpgyydb"; 
 
-    // Construct the payload
-    // We add _subject to make the dashboard easier to read
     const payload: any = {
         message: feedbackText,
         category: feedbackType,
@@ -64,9 +61,6 @@ const Settings = () => {
         _subject: `PinSeeker Feedback: ${feedbackType}`
     };
 
-    // Strict Email Handling:
-    // Only attach the 'email' field if it is not empty and looks like an email.
-    // Sending "Anonymous" text in an 'email' field often causes Formspree to silently reject data.
     if (feedbackEmail && feedbackEmail.includes('@')) {
         payload.email = feedbackEmail;
     }
@@ -76,24 +70,22 @@ const Settings = () => {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Accept': 'application/json' // Explicitly tell Formspree we want JSON back
+                'Accept': 'application/json'
             },
             body: JSON.stringify(payload)
         });
 
         if (response.ok) {
-            alert("Feedback sent successfully! Check your Formspree dashboard (and Spam folder).");
+            alert("Feedback sent successfully!");
             setShowFeedback(false);
             setFeedbackText('');
             setFeedbackEmail('');
             setFeedbackType('Suggestion');
         } else {
             const data = await response.json();
-            console.error("Formspree Error:", data);
             alert("Failed to send feedback. " + (data.error || "Please try again later."));
         }
     } catch (error) {
-        console.error("Feedback Network Error:", error);
         alert("Network error. Please check your connection.");
     } finally {
         setIsSending(false);
@@ -105,7 +97,6 @@ const Settings = () => {
       <h1 className="text-2xl font-bold text-white mb-6">Settings</h1>
 
       <div className="space-y-4">
-        {/* Install App Button - Always Visible Now */}
         <button
             onClick={handleInstallClick}
             className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white rounded-xl p-4 flex items-center gap-3 shadow-lg shadow-blue-900/30 group transition-all"
@@ -121,7 +112,6 @@ const Settings = () => {
             </div>
         </button>
 
-        {/* Unit Toggle */}
         <div className="bg-gray-900 rounded-xl p-4 flex items-center justify-between border border-gray-800">
             <div className="flex items-center gap-3">
                 <div className="bg-gray-800 p-2 rounded-lg">
@@ -140,7 +130,6 @@ const Settings = () => {
             </button>
         </div>
 
-        {/* Club Management */}
         <button 
             onClick={() => navigate('/settings/clubs')}
             className="w-full bg-gray-900 rounded-xl p-4 flex items-center gap-3 border border-gray-800 hover:bg-gray-800 transition-colors group"
@@ -155,7 +144,6 @@ const Settings = () => {
             <div className="text-gray-600 group-hover:text-white transition-colors">→</div>
         </button>
 
-        {/* Course Database */}
         <button 
             onClick={() => navigate('/settings/courses')}
             className="w-full bg-gray-900 rounded-xl p-4 flex items-center gap-3 border border-gray-800 hover:bg-gray-800 transition-colors group"
@@ -170,7 +158,6 @@ const Settings = () => {
             <div className="text-gray-600 group-hover:text-white transition-colors">→</div>
         </button>
 
-        {/* Product Tour */}
         <button 
             onClick={() => setShowTutorial(true)}
             className="w-full bg-gray-900 rounded-xl p-4 flex items-center gap-3 border border-gray-800 hover:bg-gray-800 transition-colors"
@@ -184,7 +171,6 @@ const Settings = () => {
             </div>
         </button>
 
-        {/* Manual */}
         <button 
             onClick={() => navigate('/manual')}
             className="w-full bg-gray-900 rounded-xl p-4 flex items-center gap-3 border border-gray-800 hover:bg-gray-800 transition-colors"
@@ -198,7 +184,6 @@ const Settings = () => {
             </div>
         </button>
 
-        {/* Feedback */}
         <button 
             onClick={() => setShowFeedback(true)}
             className="w-full bg-gray-900 rounded-xl p-4 flex items-center gap-3 border border-gray-800 hover:bg-gray-800 transition-colors"
@@ -214,7 +199,7 @@ const Settings = () => {
       </div>
       
       <div className="text-center text-xs text-gray-600 mt-10">
-          PinSeeker Web v7.11.0
+          PinSeeker Web v7.12.0
       </div>
 
       {showInstallHelp && (
@@ -247,7 +232,7 @@ const Settings = () => {
                         Your browser doesn't support automatic installation or the app is already installed.
                     </p>
                     <div className="text-left text-sm text-gray-300 bg-gray-800 p-4 rounded-xl mb-6">
-                        <p className="mb-2"><strong>Tip:</strong> Look for the "Add to Home Screen" or "Install App" option in your browser menu (usually the three dots icon).</p>
+                        <p className="mb-2"><strong>Tip:</strong> Look for the "Add to Home Screen" or "Install App" option in your browser menu.</p>
                     </div>
                  </>
              )}
@@ -272,7 +257,7 @@ const Settings = () => {
             </div>
             <div className="p-6 bg-gray-900 overflow-y-auto max-h-[70vh]">
                 <p className="text-sm text-gray-400 mb-6">
-                    Help us improve PinSeeker. Your feedback will be sent directly to the development team via Formspree.
+                    Help us improve PinSeeker.
                 </p>
                 
                 <div className="space-y-4">

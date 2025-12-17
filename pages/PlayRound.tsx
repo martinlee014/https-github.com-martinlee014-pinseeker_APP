@@ -284,7 +284,6 @@ const RotatedMapHandler = ({
         const dy = clientPos.y - cy;
 
         // Undo Scale
-        // Fixed: Scale is now 1 because we size the container to 150vmax instead of scaling it.
         const scale = 1;
         const unscaledDx = dx / scale;
         const unscaledDy = dy / scale;
@@ -311,13 +310,23 @@ const RotatedMapHandler = ({
     };
 
     const handleStart = (e: MouseEvent | TouchEvent) => {
-      if ((e as MouseEvent).button === 2) return; 
+      // Prevent browser default context menu behavior at start of touch
+      if (window.TouchEvent && e instanceof TouchEvent) {
+         // We don't always want to preventDefault on start because it might block scrolling,
+         // but we must stop propagation.
+         e.stopPropagation();
+      }
+
+      if ((e as MouseEvent).button === 2) {
+          e.preventDefault();
+          return;
+      }
 
       if (window.TouchEvent && e instanceof TouchEvent && e.touches.length > 1) {
           isMultiTouch.current = true;
           if (longPressTimer.current) clearTimeout(longPressTimer.current);
           isDragging.current = false;
-          startClientPos.current = null; // Invalidate any potential click
+          startClientPos.current = null;
           return;
       }
 
@@ -328,7 +337,6 @@ const RotatedMapHandler = ({
       lastPos.current = pos;
       startClientPos.current = pos;
 
-      // Only start Long Press timer if NOT on an interactive element (Marker, Polyline)
       const target = e.target as HTMLElement;
       const isInteractive = target.closest('.leaflet-interactive') || target.closest('.leaflet-popup-pane');
       
@@ -337,7 +345,7 @@ const RotatedMapHandler = ({
               isDragging.current = false;
               if (!hasMovedSignificantly.current && !isMultiTouch.current) {
                   handleLongPress(pos);
-                  startClientPos.current = null; // Consume event
+                  startClientPos.current = null;
               }
           }, 600);
       }
@@ -348,7 +356,7 @@ const RotatedMapHandler = ({
           isMultiTouch.current = true;
           if (longPressTimer.current) clearTimeout(longPressTimer.current);
           isDragging.current = false;
-          startClientPos.current = null; // Invalidate potential click
+          startClientPos.current = null;
           return;
       }
 
@@ -385,7 +393,6 @@ const RotatedMapHandler = ({
           longPressTimer.current = null;
       }
 
-      // If multitouch occurred at any point, do not trigger click
       if (isMultiTouch.current) {
           isDragging.current = false;
           lastPos.current = null;
@@ -394,8 +401,6 @@ const RotatedMapHandler = ({
       }
 
       if (startClientPos.current && !hasMovedSignificantly.current) {
-         // If we clicked on an interactive element, we skipped the long press timer logic.
-         // But we might still want to trigger click if it wasn't interactive.
          const target = e.target as HTMLElement;
          const isInteractive = target.closest('.leaflet-interactive') || target.closest('.leaflet-popup-pane');
          
@@ -411,20 +416,18 @@ const RotatedMapHandler = ({
     };
 
     const handleContextMenu = (e: MouseEvent) => {
-        e.preventDefault(); // Always block native context menu
+        // ALWAYS prevent default context menu on the map container
+        e.preventDefault();
+        e.stopPropagation();
 
-        // Filter out contextmenu events that originate from touch interactions 
-        // (like 2-finger taps or browser-simulated long presses).
-        // We handle Touch Long Press via the timer in handleStart/handleMove.
-        // This prevents double-firing and avoids the "Zoom triggers Text Box" bug.
         const isTouch = (e as any).pointerType === 'touch' || (e as any).sourceCapabilities?.firesTouchEvents;
         
         if (!isTouch) {
-             // Handle actual Mouse Right-Clicks using our rotation-corrected logic
              const pos = getClientPos(e);
              const latlng = calculateLatLng(pos);
              onLongPress({ lat: latlng.lat, lng: latlng.lng });
         }
+        return false;
     };
 
     container.addEventListener('mousedown', handleStart);
@@ -433,7 +436,7 @@ const RotatedMapHandler = ({
     window.addEventListener('touchmove', handleMove, { passive: false });
     window.addEventListener('mouseup', handleEnd);
     window.addEventListener('touchend', handleEnd);
-    container.addEventListener('contextmenu', handleContextMenu);
+    container.addEventListener('contextmenu', handleContextMenu, true);
 
     return () => {
       container.removeEventListener('mousedown', handleStart);
@@ -442,7 +445,7 @@ const RotatedMapHandler = ({
       window.removeEventListener('touchmove', handleMove);
       window.removeEventListener('mouseup', handleEnd);
       window.removeEventListener('touchend', handleEnd);
-      container.removeEventListener('contextmenu', handleContextMenu);
+      container.removeEventListener('contextmenu', handleContextMenu, true);
     };
   }, [map, rotation, onLongPress, onClick]);
 
@@ -452,7 +455,6 @@ const RotatedMapHandler = ({
 const MapInitializer = ({ center, isReplay, pointsToFit }: { center: LatLng, isReplay: boolean, pointsToFit?: LatLng[] }) => {
     const map = useMap();
     
-    // Fix: Force Leaflet to recalculate container size after mount or resize
     useEffect(() => {
         const resizeObserver = new ResizeObserver(() => {
             map.invalidateSize();
@@ -537,36 +539,31 @@ const PlayRound = () => {
   // --- Deletion State ---
   const [shotToDelete, setShotToDelete] = useState<ShotRecord | null>(null);
 
-  // --- GPS Tracking State (New) ---
+  // --- GPS Tracking State ---
   const [liveLocation, setLiveLocation] = useState<LatLng | null>(null);
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
   const [gpsSignalLevel, setGpsSignalLevel] = useState<0 | 1 | 2 | 3>(0);
   const watchIdRef = useRef<number | null>(null);
 
-  // GPS Button Logic Refs
   const gpsPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isLongPressAction = useRef(false);
 
-  // Annotation Long Press Logic
   const annotationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const annotationStartPos = useRef<{x: number, y: number} | null>(null);
 
   const hole = activeCourse.holes[currentHoleIdx];
 
   useEffect(() => {
-    // If we have passed a course, use it.
     if (passedCourse) {
         setActiveCourse(passedCourse);
     }
     
-    // Initialize state
     if (isReplay && replayRound) {
         setShots(replayRound.shots);
         setScorecard(replayRound.scorecard);
         const h = activeCourse.holes[initialHoleIdx];
         if (h) setCurrentBallPos(h.tee);
     } else {
-        // Active Round
         const searchParams = new URLSearchParams(location.search);
         if (searchParams.get('restore') === 'true' && user) {
             const saved = StorageService.getTempState(user);
@@ -590,29 +587,24 @@ const PlayRound = () => {
     }
   }, []);
 
-  // --- GPS WATCH IMPLEMENTATION ---
   useEffect(() => {
     if (isReplay || !navigator.geolocation) return;
 
-    // Start watching position immediately to "warm up" GPS
     watchIdRef.current = navigator.geolocation.watchPosition(
         (position) => {
             const { latitude, longitude, accuracy } = position.coords;
             setLiveLocation({ lat: latitude, lng: longitude });
             setGpsAccuracy(accuracy);
-
-            // Determine rough signal level based on accuracy (meters)
-            if (accuracy <= 10) setGpsSignalLevel(3); // High
-            else if (accuracy <= 30) setGpsSignalLevel(2); // Med
-            else setGpsSignalLevel(1); // Low
+            if (accuracy <= 10) setGpsSignalLevel(3);
+            else if (accuracy <= 30) setGpsSignalLevel(2);
+            else setGpsSignalLevel(1);
         },
         (error) => {
-            console.warn("GPS Watch Error:", error);
             setGpsSignalLevel(0);
         },
         {
             enableHighAccuracy: true,
-            maximumAge: 2000, // Accept cached positions up to 2s old
+            maximumAge: 2000,
             timeout: 10000
         }
     );
@@ -633,7 +625,6 @@ const PlayRound = () => {
       }
   }, [currentHoleIdx, activeCourse]);
 
-  // Load annotations when hole changes
   useEffect(() => {
     if (hole && activeCourse) {
         const notes = StorageService.getAnnotations(activeCourse.id, hole.number);
@@ -641,18 +632,12 @@ const PlayRound = () => {
     }
   }, [currentHoleIdx, activeCourse]);
 
-  // Updated: Sync active club stats when bag changes (e.g. returning from editing)
   useEffect(() => {
     if (bag.length > 0) {
-      // Find the currently selected club in the new bag
       const updatedClub = bag.find(c => c.name === selectedClub.name);
-      
       if (updatedClub) {
-          // If the stats have changed (or object ref changed), update selectedClub
-          // This ensures new carry distances apply immediately
           setSelectedClub(updatedClub);
       } else {
-          // If the club was deleted, default to the first one
           setSelectedClub(bag[0]);
       }
     }
@@ -729,29 +714,18 @@ const PlayRound = () => {
   useEffect(() => {
     if (!isReplay && bag.length > 0 && !isMeasureMode) {
       const dist = distToGreen;
-      
       if (dist < 50) {
         setSelectedClub(bag[bag.length - 1]); 
       } else {
-        // --- NEW LOGIC: Exclude Driver if not on Tee (ShotNum > 1) ---
         let validClubs = bag;
         if (shotNum > 1) {
-            // Updated: Case-insensitive check to strictly exclude driver on non-tee shots
             validClubs = bag.filter(c => !c.name.toLowerCase().includes('driver'));
         }
-        
-        // Find suitable club
-        // Bag is sorted Longest to Shortest (Driver -> Putter)
-        // Reverse to search Shortest -> Longest
         const sortedValid = [...validClubs].sort((a,b) => b.carry - a.carry);
         let suitable = [...sortedValid].reverse().find(c => c.carry >= dist - 10);
-        
-        // If no club reaches, check for layup strategy
         if (!suitable && currentLayupStrategy) {
-            // Auto-select the first club of the optimal layup pair
             suitable = currentLayupStrategy.club1;
         }
-
         const bestClub = suitable || sortedValid[0];
         if (bestClub) {
             setSelectedClub(bestClub);
@@ -761,21 +735,15 @@ const PlayRound = () => {
   }, [currentBallPos, currentHoleIdx, isReplay, isMeasureMode, shotNum, distToGreen]);
 
   const nextClubSuggestion = useMemo(() => {
-    // If we have a layup strategy recommendation because target is too far
     if (currentLayupStrategy && shotNum > 1 && bag.length > 1) {
-        // Check if distance is truly far enough to warrant strategy display
         const longestValid = bag.find(c => !c.name.toLowerCase().includes('driver')) || bag[0];
         if (distToGreen > longestValid.carry + 10) {
            return `${currentLayupStrategy.club1.name} + ${currentLayupStrategy.club2.name}`;
         }
     }
-
     if (distLandingToGreen < 20) return "Putter";
-
-    // For next shot suggestion, also filter out Driver (since next shot is definitely fairway/rough)
     const validForNext = bag.filter(c => !c.name.toLowerCase().includes('driver'));
-    if (validForNext.length === 0) return "Club"; // Fallback if user only has driver
-
+    if (validForNext.length === 0) return "Club";
     const sorted = [...validForNext].sort((a,b) => a.carry - b.carry);
     const match = sorted.find(c => c.carry >= distLandingToGreen);
     if (match) return match.name;
@@ -804,15 +772,9 @@ const PlayRound = () => {
     }
     
     if (isMeasureMode) {
-        // SAFETY GUARD: Prevent accidental target setting when trying to drag the start point.
-        // If click is within ~5 meters of the start point, ignore it.
         const clickPos = { lat: latlng.lat, lng: latlng.lng };
         const distToStart = MathUtils.calculateDistance(currentBallPos, clickPos);
-        
-        if (distToStart < 5) {
-            return;
-        }
-
+        if (distToStart < 5) return;
         setMeasureTarget({ lat: latlng.lat, lng: latlng.lng });
         return;
     }
@@ -869,11 +831,9 @@ const PlayRound = () => {
      }
   };
 
-  // --- Helper to create robust long-press handlers for annotations ---
   const createAnnotationHandlers = (id: string) => {
       if (!isNoteMode) return {};
 
-      // Common helper to get coordinates from any event type
       const getEventPos = (evt: any) => {
           if (evt.touches && evt.touches.length > 0) {
               return { x: evt.touches[0].clientX, y: evt.touches[0].clientY };
@@ -883,8 +843,10 @@ const PlayRound = () => {
 
       const handleClick = (e: L.LeafletMouseEvent | L.LeafletEvent) => {
           const evt = (e as any).originalEvent;
-          if (evt) L.DomEvent.stopPropagation(evt);
-          
+          if (evt) {
+              L.DomEvent.stopPropagation(evt);
+              L.DomEvent.preventDefault(evt);
+          }
           if (activeTool === 'eraser') {
               deleteAnnotation(id);
           }
@@ -894,16 +856,12 @@ const PlayRound = () => {
           const originalEvent = (e as any).originalEvent;
           if (originalEvent) {
              L.DomEvent.stopPropagation(originalEvent);
+             L.DomEvent.preventDefault(originalEvent);
           }
-          
-          // If we are in eraser mode, we handle delete on CLICK/TAP, not long press.
           if (activeTool === 'eraser') return;
-
           if (annotationTimer.current) clearTimeout(annotationTimer.current);
-
           const pos = getEventPos(originalEvent);
           annotationStartPos.current = pos;
-
           annotationTimer.current = setTimeout(() => {
               if (navigator.vibrate) navigator.vibrate(50);
               deleteAnnotation(id);
@@ -913,16 +871,13 @@ const PlayRound = () => {
 
       const handleMove = (e: L.LeafletMouseEvent | L.LeafletEvent) => {
           if (!annotationTimer.current || !annotationStartPos.current) return;
-          
           const evt = (e as any).originalEvent;
           if (!evt) return;
-
           const pos = getEventPos(evt);
           const dist = Math.sqrt(
               Math.pow(pos.x - annotationStartPos.current.x, 2) + 
               Math.pow(pos.y - annotationStartPos.current.y, 2)
           );
-
           if (dist > 10) {
               clearTimeout(annotationTimer.current);
               annotationTimer.current = null;
@@ -954,7 +909,6 @@ const PlayRound = () => {
 
   const handleManualDrop = (latlng: any) => {
     if (isReplay || isMeasureMode) return;
-    
     if (isNoteMode) {
         if (activeTool === 'text') {
             setShowTextInput({lat: latlng.lat, lng: latlng.lng});
@@ -962,27 +916,21 @@ const PlayRound = () => {
         }
         return;
     }
-
     const pos = { lat: latlng.lat, lng: latlng.lng };
     const dist = MathUtils.calculateDistance(currentBallPos, pos);
     setPendingShot({ pos, isGPS: false, dist });
   };
 
   const initiateGPSShot = () => {
-    // IMPROVED: Use live location if available (from watchPosition) for zero latency
     if (liveLocation && gpsAccuracy && gpsAccuracy < 50) {
         const dist = MathUtils.calculateDistance(currentBallPos, liveLocation);
         setPendingShot({ pos: liveLocation, isGPS: true, dist });
         return;
     }
-
-    // Fallback: Force a one-time get if watch isn't ready or stale (though watch is preferred)
     if (!navigator.geolocation) {
       alert("Geolocation not supported");
       return;
     }
-    
-    // UI feedback that we are forcing a location fetch
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const gpsPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
@@ -995,14 +943,12 @@ const PlayRound = () => {
   };
 
   const setTeeToGPS = () => {
-    // IMPROVED: Use live location if available
     if (liveLocation && gpsAccuracy && gpsAccuracy < 50) {
         setCurrentBallPos(liveLocation);
         if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
-        alert("Start position updated to current GPS location (Instant).");
+        alert("Start position updated to current GPS location.");
         return;
     }
-
     if (!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition((pos) => {
       const gpsPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
@@ -1013,13 +959,11 @@ const PlayRound = () => {
   };
 
   const handleMeasureGPS = () => {
-      // IMPROVED: Use live location
       if (liveLocation) {
           setCurrentBallPos(liveLocation);
           if (navigator.vibrate) navigator.vibrate(50);
           return;
       }
-
       if (!navigator.geolocation) {
           alert("Geolocation not supported");
           return;
@@ -1035,7 +979,6 @@ const PlayRound = () => {
     if(e.cancelable) e.preventDefault();
     isLongPressAction.current = false;
     if (gpsPressTimer.current) clearTimeout(gpsPressTimer.current);
-
     gpsPressTimer.current = setTimeout(() => {
        isLongPressAction.current = true;
        if (navigator.vibrate) navigator.vibrate(100);
@@ -1080,9 +1023,7 @@ const PlayRound = () => {
         setShotNum(prev => prev + 1);
         setAimAngle(0);
         setPendingShot(null); 
-    } catch(err) {
-        console.error("Error saving shot:", err);
-    }
+    } catch(err) {}
   };
 
   const handleDeleteShot = () => {
@@ -1099,13 +1040,7 @@ const PlayRound = () => {
   };
 
   const saveHoleScore = (totalScore: number, putts: number, pens: number) => {
-    // We now receive the confirmed Total Score from the user.
-    // The data model stores 'shotsTaken' which typically means shots to reach/hole-out on green.
-    // Score = shotsTaken + putts + penalties.
-    // Therefore: shotsTaken = Score - putts - penalties.
-    
     const shotsTaken = Math.max(0, totalScore - putts - pens);
-
     const newScore: HoleScore = {
       holeNumber: hole.number,
       par: hole.par,
@@ -1164,7 +1099,7 @@ const PlayRound = () => {
       const newState = !isNoteMode;
       setIsNoteMode(newState);
       setIsMeasureMode(false);
-      setActiveTool('text'); // Default tool
+      setActiveTool('text');
       setDrawingPoints([]);
       setShowTextInput(null);
   };
@@ -1173,7 +1108,6 @@ const PlayRound = () => {
       const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
       const cx = rect.width / 2;
       const cy = rect.height / 2;
-      
       let clientX, clientY;
       if ('touches' in e) {
           clientX = e.touches[0].clientX;
@@ -1182,16 +1116,12 @@ const PlayRound = () => {
           clientX = (e as React.MouseEvent).clientX;
           clientY = (e as React.MouseEvent).clientY;
       }
-
       const x = clientX - rect.left - cx;
       const y = clientY - rect.top - cy;
-
       let angleRad = Math.atan2(y, x);
       let angleDeg = angleRad * (180 / Math.PI);
-      
       angleDeg += 90;
       if (angleDeg < 0) angleDeg += 360;
-      
       const newDir = (baseBearing + angleDeg) % 360;
       setWindDir(Math.round(newDir));
   };
@@ -1205,12 +1135,11 @@ const PlayRound = () => {
 
   return (
     <div 
-        className="h-full relative bg-gray-900 flex flex-col overflow-hidden select-none"
+        className="h-full relative bg-gray-900 flex flex-col overflow-hidden select-none touch-none"
         onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
     >
       {/* Map Area */}
       <div className="absolute inset-0 z-0 bg-black w-full h-full overflow-hidden">
-        {/* Fixed: Use large sizing instead of scaling to ensure coverage of corners when rotated on all aspect ratios */}
         <div style={{ 
             position: 'absolute',
             top: '50%',
@@ -1235,14 +1164,12 @@ const PlayRound = () => {
               <RotatedMapHandler rotation={mapRotation} onLongPress={handleManualDrop} onClick={handleMapClick} />
               <MapInitializer center={currentBallPos} isReplay={isReplay} pointsToFit={replayPoints} />
               
-              {/* Live Location Marker (Blue Dot) */}
               {!isReplay && liveLocation && (
                   <Marker position={[liveLocation.lat, liveLocation.lng]} icon={userLocationIcon} zIndexOffset={1000} interactive={false} />
               )}
 
               <Marker position={[hole.green.lat, hole.green.lng]} icon={flagIcon} />
               
-              {/* User Annotations */}
               {annotations.map(note => {
                  const handlers = createAnnotationHandlers(note.id);
                  if (note.type === 'path' && note.points.length > 1) {
@@ -1279,7 +1206,6 @@ const PlayRound = () => {
                  return null;
               })}
 
-              {/* Active Drawing Line */}
               {isNoteMode && drawingPoints.length > 0 && (
                   <>
                       {drawingPoints.map((p, i) => (
@@ -1289,12 +1215,9 @@ const PlayRound = () => {
                   </>
               )}
 
-
-              {/* Render Past Shots */}
               {holeShots.map((s, i) => {
                   const curvePoints = MathUtils.getArcPoints(s.from, s.to);
                   const startIcon = s.shotNumber === 1 ? startMarkerIcon : ballIcon;
-                  
                   let plannedEllipse = [];
                   if (s.plannedInfo) {
                     plannedEllipse = MathUtils.getEllipsePoints(
@@ -1304,13 +1227,11 @@ const PlayRound = () => {
                       s.plannedInfo.dispersion.rotation
                     ).map(p => [p.lat, p.lng] as [number, number]);
                   }
-
                   return (
                     <Fragment key={i}>
                         <Marker position={[s.from.lat, s.from.lng]} icon={startIcon} />
                         <Polyline positions={[[s.from.lat, s.from.lng], [s.to.lat, s.to.lng]]} pathOptions={{ color: "black", weight: 4, opacity: 0.3 }} interactive={false} />
                         <Polyline positions={curvePoints.map(p => [p.lat, p.lng])} pathOptions={{ color: "white", weight: 2, opacity: 0.8 }} interactive={false} />
-                        
                         {isReplay ? (
                             <>
                               <Marker position={[s.to.lat, s.to.lng]} icon={createReplayLabelIcon(`${s.clubUsed} - ${MathUtils.formatDistance(s.distance, useYards)}`, -mapRotation)} interactive={false} />
@@ -1325,6 +1246,7 @@ const PlayRound = () => {
                                 eventHandlers={{
                                     contextmenu: (e) => {
                                         L.DomEvent.stopPropagation(e.originalEvent);
+                                        L.DomEvent.preventDefault(e.originalEvent);
                                         setShotToDelete(s);
                                     }
                                 }}
@@ -1334,7 +1256,6 @@ const PlayRound = () => {
                   );
               })}
 
-              {/* Strategy Mode Visuals - Updated to be non-interactive so manual drop works through them */}
               {!isReplay && !isMeasureMode && !isNoteMode && (
                   <>
                       <Marker position={[currentBallPos.lat, currentBallPos.lng]} icon={shotNum === 1 ? startMarkerIcon : ballIcon} interactive={false} />
@@ -1346,7 +1267,6 @@ const PlayRound = () => {
                   </>
               )}
 
-              {/* Measurement Mode Visuals */}
               {!isReplay && isMeasureMode && activeMeasureTarget && (
                   <>
                       <Marker 
@@ -1419,14 +1339,12 @@ const PlayRound = () => {
                >
                   <Ruler size={20} />
                </button>
-               
                <button 
                 onClick={toggleNoteMode} 
                 className={`p-2.5 rounded-full shadow-lg backdrop-blur-md border border-white/10 transition-all active:scale-95 ${isNoteMode ? 'bg-yellow-600 text-white' : 'bg-black/50 text-yellow-400 hover:bg-black/70'}`}
                >
                   <PenTool size={20} />
                </button>
-
                <button onClick={() => setShowWind(!showWind)} className={`p-2.5 rounded-full shadow-lg backdrop-blur-md border border-white/10 transition-all active:scale-95 ${showWind ? 'bg-black/70 text-blue-400' : 'bg-black/50 text-gray-400 hover:bg-black/70'}`}><Wind size={20} /></button>
              </>
            )}
@@ -1473,7 +1391,6 @@ const PlayRound = () => {
         </div>
       )}
 
-      {/* NEW: ANNOTATION TOOLBAR */}
       {isNoteMode && (
           <div className="absolute bottom-[20%] left-1/2 -translate-x-1/2 z-[1000] bg-gray-900/90 backdrop-blur-xl border border-yellow-500/30 rounded-2xl p-2 flex gap-2 shadow-2xl scale-110">
               <button 
@@ -1504,7 +1421,6 @@ const PlayRound = () => {
           </div>
       )}
       
-      {/* Drawing Actions (Finish/Cancel) */}
       {isNoteMode && activeTool === 'draw' && drawingPoints.length > 0 && (
           <div className="absolute bottom-[10%] left-1/2 -translate-x-1/2 z-[1000] flex gap-2">
                <button 
@@ -1522,7 +1438,6 @@ const PlayRound = () => {
           </div>
       )}
 
-      {/* Text Input Modal */}
       {showTextInput && (
           <ModalOverlay onClose={() => setShowTextInput(null)}>
               <div className="p-4 bg-gray-900 rounded-xl">
@@ -1630,7 +1545,6 @@ const PlayRound = () => {
                 <h3 className="text-xl font-bold text-white mb-2">Delete Shot?</h3>
                 <p className="text-gray-400 text-sm mb-6">
                     Are you sure you want to remove this shot record? 
-                    {shots.indexOf(shotToDelete) === shots.length - 1 && " This will reset your position to the previous shot."}
                 </p>
                 <div className="flex gap-3">
                     <button onClick={() => setShotToDelete(null)} className="flex-1 bg-gray-800 hover:bg-gray-700 text-white font-bold py-3 rounded-xl border border-gray-700">Cancel</button>
