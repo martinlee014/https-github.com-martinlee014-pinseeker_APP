@@ -49,7 +49,6 @@ const MainLayout = ({ children }: { children?: ReactNode }) => {
   const isEditorMode = location.pathname.includes('/edit');
 
   return (
-    // Changed h-screen to h-[100dvh] to handle mobile browser bars correctly
     <div className="flex flex-col h-[100dvh] max-w-md mx-auto bg-black relative shadow-2xl overflow-hidden">
       {/* Header */}
       {!isPlayMode && !isEditorMode && (
@@ -110,10 +109,11 @@ const App = () => {
   // Load bag and check tutorial on mount
   useEffect(() => {
     setBag(StorageService.getBag());
-    if (user && !StorageService.hasSeenOnboarding()) {
+    // Onboarding should appear before user login if it's their first time visiting the app
+    if (!StorageService.hasSeenOnboarding()) {
         setShowTutorial(true);
     }
-  }, [user]);
+  }, []);
 
   const login = (username: string) => {
     setUser(username);
