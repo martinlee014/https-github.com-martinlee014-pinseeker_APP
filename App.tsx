@@ -104,11 +104,15 @@ const App = () => {
   const [user, setUser] = useState<string | null>(StorageService.getCurrentUser());
   const [useYards, setUseYards] = useState<boolean>(StorageService.getUseYards());
   const [bag, setBag] = useState<ClubStats[]>([]);
-  const [showTutorial, setShowTutorial] = useState(!StorageService.hasSeenOnboarding());
+  const [showTutorial, setShowTutorial] = useState(false);
 
-  // Load bag on mount
+  // Load bag and check tutorial on mount
   useEffect(() => {
     setBag(StorageService.getBag());
+    // Onboarding should appear before user login if it's their first time visiting the app
+    if (!StorageService.hasSeenOnboarding()) {
+        setShowTutorial(true);
+    }
   }, []);
 
   const login = (username: string) => {
@@ -131,10 +135,10 @@ const App = () => {
     setBag(newBag);
     StorageService.saveBag(newBag);
   };
-
+  
   const handleCloseTutorial = () => {
-    StorageService.markOnboardingSeen();
-    setShowTutorial(false);
+      setShowTutorial(false);
+      StorageService.markOnboardingSeen();
   };
 
   return (

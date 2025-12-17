@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useContext, useMemo, useRef, Fragment } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Polyline, Polygon, useMap } from 'react-leaflet';
@@ -239,26 +238,15 @@ const GolfBagIcon = ({ size = 24, className = "" }: { size?: number, className?:
 
 const RotatedMapHandler = ({ 
     rotation, 
-    isMeasureMode,
-    currentBallPos,
-    measureTarget,
     onLongPress,
-    onClick,
-    onMoveStartPoint,
-    onMoveTargetPoint
+    onClick
 }: { 
     rotation: number, 
-    isMeasureMode: boolean,
-    currentBallPos: LatLng,
-    measureTarget: LatLng | null,
     onLongPress: (latlng: LatLng) => void,
-    onClick: (latlng: LatLng) => void,
-    onMoveStartPoint: (latlng: LatLng) => void,
-    onMoveTargetPoint: (latlng: LatLng) => void
+    onClick: (latlng: LatLng) => void
 }) => {
   const map = useMap();
   const isDragging = useRef(false);
-  const dragType = useRef<'map' | 'marker-start' | 'marker-target'>('map');
   const lastPos = useRef<{x: number, y: number} | null>(null);
   
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -276,27 +264,33 @@ const RotatedMapHandler = ({
       return { x: (e as MouseEvent).clientX, y: (e as MouseEvent).clientY };
     };
 
-    // Correctly convert screen coordinates to LatLng in a rotated container
     const calculateLatLng = (clientPos: {x: number, y: number}) => {
         const rect = container.getBoundingClientRect();
         const cx = rect.left + rect.width / 2;
         const cy = rect.top + rect.height / 2;
-
         const dx = clientPos.x - cx;
         const dy = clientPos.y - cy;
-
-        // Invert rotation
         const angleRad = (-rotation * Math.PI) / 180;
         const rotatedX = dx * Math.cos(angleRad) - dy * Math.sin(angleRad);
         const rotatedY = dx * Math.sin(angleRad) + dy * Math.cos(angleRad);
-
         const mapSize = map.getSize();
         const leafPoint = L.point(mapSize.x / 2 + rotatedX, mapSize.y / 2 + rotatedY);
         return map.containerPointToLatLng(leafPoint);
     };
 
+    const handleLongPress = (clientPos: {x: number, y: number}) => {
+        const latlng = calculateLatLng(clientPos);
+        if (navigator.vibrate) navigator.vibrate(50);
+        onLongPress({ lat: latlng.lat, lng: latlng.lng });
+    };
+
     const handleStart = (e: MouseEvent | TouchEvent) => {
       e.stopPropagation();
+      if ((e as MouseEvent).button === 2) {
+          e.preventDefault();
+          return;
+      }
+
       if (window.TouchEvent && e instanceof TouchEvent && e.touches.length > 1) {
           isMultiTouch.current = true;
           if (longPressTimer.current) clearTimeout(longPressTimer.current);
@@ -312,48 +306,15 @@ const RotatedMapHandler = ({
       startClientPos.current = pos;
 
       const target = e.target as HTMLElement;
-
-      // Detection for draggable markers in Measure Mode
-      if (isMeasureMode) {
-          const rect = container.getBoundingClientRect();
-          const theta = rotation * (Math.PI / 180);
-
-          const checkMarkerDist = (latlng: LatLng) => {
-              const pt = map.latLngToContainerPoint([latlng.lat, latlng.lng]);
-              const mapSize = map.getSize();
-              const mcx = mapSize.x / 2;
-              const mcy = mapSize.y / 2;
-              const rdx = pt.x - mcx;
-              const rdy = pt.y - mcy;
-              
-              // Project map point to screen point
-              const screenX = rect.left + mcx + (rdx * Math.cos(theta) - rdy * Math.sin(theta));
-              const screenY = rect.top + mcy + (rdx * Math.sin(theta) + rdy * Math.cos(theta));
-              
-              return Math.sqrt(Math.pow(pos.x - screenX, 2) + Math.pow(pos.y - screenY, 2));
-          };
-
-          if (checkMarkerDist(currentBallPos) < 40) {
-              dragType.current = 'marker-start';
-              if (navigator.vibrate) navigator.vibrate(10);
-              return;
-          }
-          if (measureTarget && checkMarkerDist(measureTarget) < 40) {
-              dragType.current = 'marker-target';
-              if (navigator.vibrate) navigator.vibrate(10);
-              return;
-          }
-      }
-
-      dragType.current = 'map';
       const isInteractive = target.closest('.leaflet-interactive') || target.closest('.leaflet-popup-pane');
+      
+      // CRITICAL: isInteractive is true if we touch a marker, but if we touch the dispersion polygon (now set to interactive: false), 
+      // it should fall through here correctly.
       if (!isInteractive) {
           longPressTimer.current = setTimeout(() => {
               isDragging.current = false;
               if (!hasMovedSignificantly.current && !isMultiTouch.current) {
-                  const latlng = calculateLatLng(pos);
-                  if (navigator.vibrate) navigator.vibrate(50);
-                  onLongPress({ lat: latlng.lat, lng: latlng.lng });
+                  handleLongPress(pos);
               }
           }, 600);
       }
@@ -381,19 +342,11 @@ const RotatedMapHandler = ({
 
       const deltaX = currentPos.x - lastPos.current.x;
       const deltaY = currentPos.y - lastPos.current.y;
+      const theta = -rotation * (Math.PI / 180); 
+      const rotatedDx = deltaX * Math.cos(theta) - deltaY * Math.sin(theta);
+      const rotatedDy = deltaX * Math.sin(theta) + deltaY * Math.cos(theta);
 
-      if (dragType.current === 'map') {
-          const theta = -rotation * (Math.PI / 180); 
-          const rotatedDx = deltaX * Math.cos(theta) - deltaY * Math.sin(theta);
-          const rotatedDy = deltaX * Math.sin(theta) + deltaY * Math.cos(theta);
-          map.panBy([-rotatedDx, -rotatedDy], { animate: false });
-      } else {
-          // Manual Marker Drag
-          const latlng = calculateLatLng(currentPos);
-          if (dragType.current === 'marker-start') onMoveStartPoint(latlng);
-          else onMoveTargetPoint(latlng);
-      }
-      
+      map.panBy([-rotatedDx, -rotatedDy], { animate: false });
       lastPos.current = currentPos;
     };
 
@@ -406,7 +359,7 @@ const RotatedMapHandler = ({
           isDragging.current = false;
           return;
       }
-      if (startClientPos.current && !hasMovedSignificantly.current && dragType.current === 'map') {
+      if (startClientPos.current && !hasMovedSignificantly.current) {
          const target = e.target as HTMLElement;
          const isInteractive = target.closest('.leaflet-interactive') || target.closest('.leaflet-popup-pane');
          if (!isInteractive) {
@@ -415,7 +368,6 @@ const RotatedMapHandler = ({
          }
       }
       isDragging.current = false;
-      dragType.current = 'map';
       lastPos.current = null;
       startClientPos.current = null;
     };
@@ -426,6 +378,7 @@ const RotatedMapHandler = ({
     window.addEventListener('touchmove', handleMove, { passive: false });
     window.addEventListener('mouseup', handleEnd);
     window.addEventListener('touchend', handleEnd);
+    container.addEventListener('contextmenu', (e) => e.preventDefault());
 
     return () => {
       container.removeEventListener('mousedown', handleStart);
@@ -435,7 +388,7 @@ const RotatedMapHandler = ({
       window.removeEventListener('mouseup', handleEnd);
       window.removeEventListener('touchend', handleEnd);
     };
-  }, [map, rotation, isMeasureMode, currentBallPos, measureTarget, onLongPress, onClick, onMoveStartPoint, onMoveTargetPoint]);
+  }, [map, rotation, onLongPress, onClick]);
 
   return null;
 };
@@ -792,20 +745,15 @@ const PlayRound = () => {
               <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" maxNativeZoom={19} maxZoom={22} noWrap={true} />
               <RotatedMapHandler 
                 rotation={mapRotation} 
-                isMeasureMode={isMeasureMode}
-                currentBallPos={currentBallPos}
-                measureTarget={measureTarget}
                 onLongPress={handleManualDrop} 
                 onClick={handleMapClick}
-                onMoveStartPoint={setCurrentBallPos}
-                onMoveTargetPoint={setMeasureTarget}
               />
               <MapInitializer center={currentBallPos} isReplay={isReplay} pointsToFit={replayPoints} />
               {!isReplay && liveLocation && <Marker position={[liveLocation.lat, liveLocation.lng]} icon={userLocationIcon} zIndexOffset={1000} />}
               <Marker position={[hole.green.lat, hole.green.lng]} icon={flagIcon} />
               {annotations.map(note => {
                  const handlers = isNoteMode ? { click: () => activeTool === 'eraser' && deleteAnnotation(note.id) } : {};
-                 if (note.type === 'path') return <Polyline key={note.id} positions={note.points.map(p => [p.lat, p.lng])} pathOptions={{ color: '#facc15', weight: 3, dashArray: '5,5', opacity: 0.8 }} eventHandlers={handlers} />;
+                 if (note.type === 'path') return <Polyline key={note.id} positions={note.points.map(p => [p.lat, p.lng])} pathOptions={{ color: '#facc15', weight: 3, dashArray: '5,5', opacity: 0.8, interactive: false }} eventHandlers={handlers} />;
                  if (note.type === 'text') return <Marker key={note.id} position={[note.points[0].lat, note.points[0].lng]} icon={createAnnotationTextIcon(note.text || "", -mapRotation)} eventHandlers={handlers} />;
                  if (note.type === 'icon') return <Marker key={note.id} position={[note.points[0].lat, note.points[0].lng]} icon={userFlagIcon} eventHandlers={handlers} />;
                  return null;
@@ -813,32 +761,32 @@ const PlayRound = () => {
               {isNoteMode && drawingPoints.length > 0 && (
                   <>
                       {drawingPoints.map((p, i) => <Marker key={i} position={[p.lat, p.lng]} icon={measureTargetIcon} />)}
-                      <Polyline positions={drawingPoints.map(p => [p.lat, p.lng])} pathOptions={{ color: '#facc15', weight: 2, dashArray: '2,4' }} />
+                      <Polyline positions={drawingPoints.map(p => [p.lat, p.lng])} pathOptions={{ color: '#facc15', weight: 2, dashArray: '2,4', interactive: false }} />
                   </>
               )}
               {holeShots.map((s, i) => (
                   <Fragment key={i}>
                       <Marker position={[s.from.lat, s.from.lng]} icon={s.shotNumber === 1 ? startMarkerIcon : ballIcon} />
-                      <Polyline positions={MathUtils.getArcPoints(s.from, s.to).map(p => [p.lat, p.lng])} pathOptions={{ color: "white", weight: 2, opacity: 0.8 }} />
+                      <Polyline positions={MathUtils.getArcPoints(s.from, s.to).map(p => [p.lat, p.lng])} pathOptions={{ color: "white", weight: 2, opacity: 0.8, interactive: false }} />
                       {isReplay ? <Marker position={[s.to.lat, s.to.lng]} icon={createReplayLabelIcon(`${s.clubUsed} - ${MathUtils.formatDistance(s.distance, useYards)}`, -mapRotation)} /> : <Marker position={[s.to.lat, s.to.lng]} icon={targetIcon} eventHandlers={{ contextmenu: (e) => { e.originalEvent.preventDefault(); setShotToDelete(s); } }} />}
                   </Fragment>
               ))}
               {!isReplay && !isMeasureMode && !isNoteMode && (
                   <>
                       <Marker position={[currentBallPos.lat, currentBallPos.lng]} icon={shotNum === 1 ? startMarkerIcon : ballIcon} />
-                      <Polyline positions={[[currentBallPos.lat, currentBallPos.lng], [predictedLanding.lat, predictedLanding.lng]]} pathOptions={{ color: "#3b82f6", weight: 3, dashArray: "5, 5" }} />
-                      <Polygon positions={ellipsePoints} pathOptions={{ color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.2, weight: 1 }} />
+                      <Polyline positions={[[currentBallPos.lat, currentBallPos.lng], [predictedLanding.lat, predictedLanding.lng]]} pathOptions={{ color: "#3b82f6", weight: 3, dashArray: "5, 5", interactive: false }} />
+                      <Polygon positions={ellipsePoints} pathOptions={{ color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.2, weight: 1, interactive: false }} />
                       <Marker position={[predictedLanding.lat, predictedLanding.lng]} icon={createArrowIcon(shotBearing)} />
-                      <Polyline positions={guideLinePoints as any} pathOptions={{ color: "#fbbf24", weight: 2, dashArray: "4, 6", opacity: 0.8 }} />
+                      <Polyline positions={guideLinePoints as any} pathOptions={{ color: "#fbbf24", weight: 2, dashArray: "4, 6", opacity: 0.8, interactive: false }} />
                       <Marker position={[guideLabelPos.lat, guideLabelPos.lng]} icon={createDistanceLabelIcon(`Leaves ${MathUtils.formatDistance(distLandingToGreen, useYards)}`, -mapRotation)} />
                   </>
               )}
               {!isReplay && isMeasureMode && activeMeasureTarget && (
                   <>
-                      <Marker position={[currentBallPos.lat, currentBallPos.lng]} icon={draggableMeasureStartIcon} zIndexOffset={1000} />
+                      <Marker position={[currentBallPos.lat, currentBallPos.lng]} icon={draggableMeasureStartIcon} draggable={true} eventHandlers={{ dragend: (e) => setCurrentBallPos(e.target.getLatLng()) }} zIndexOffset={1000} />
                       <Marker position={[activeMeasureTarget.lat, activeMeasureTarget.lng]} icon={measureTargetIcon} />
-                      <Polyline positions={[[currentBallPos.lat, currentBallPos.lng], [activeMeasureTarget.lat, activeMeasureTarget.lng]]} pathOptions={{ color: "#60a5fa", weight: 4, opacity: 1 }} />
-                      <Polyline positions={[[activeMeasureTarget.lat, activeMeasureTarget.lng], [hole.green.lat, hole.green.lng]]} pathOptions={{ color: "#ffffff", weight: 3, dashArray: "8, 8", opacity: 0.8 }} />
+                      <Polyline positions={[[currentBallPos.lat, currentBallPos.lng], [activeMeasureTarget.lat, activeMeasureTarget.lng]]} pathOptions={{ color: "#60a5fa", weight: 4, opacity: 1, interactive: false }} />
+                      <Polyline positions={[[activeMeasureTarget.lat, activeMeasureTarget.lng], [hole.green.lat, hole.green.lng]]} pathOptions={{ color: "#ffffff", weight: 3, dashArray: "8, 8", opacity: 0.8, interactive: false }} />
                       <Marker position={[labelPos1.lat, labelPos1.lng]} icon={createDistanceLabelIcon(MathUtils.formatDistance(measureDist1, useYards), -mapRotation, '#60a5fa')} />
                       <Marker position={[labelPos2.lat, labelPos2.lng]} icon={createDistanceLabelIcon(MathUtils.formatDistance(measureDist2, useYards), -mapRotation, '#ffffff')} />
                   </>

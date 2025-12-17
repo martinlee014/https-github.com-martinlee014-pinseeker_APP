@@ -1,38 +1,30 @@
-
 # PinSeeker Web - Development Log
 
-## Version: V7.12.0 (UI Stability & Mobile UX Fixes)
-**Date:** 2024-06-03
+## Version: V7.14.0 (Interaction Layer Optimization)
+**Date:** 2024-06-05
 **Branch:** `main`
-**Status:** ✅ RELEASED
+**Status:** ✅ ARCHIVED
 
 ### Features & Fixes
-- **Mobile Context Menu Suppression**:
-  - Implemented aggressive CSS and JS event interception to prevent native "Save Image" and "View Image" popups during long-press on the map.
-  - Added `-webkit-touch-callout: none` and `-webkit-user-drag: none` to all interactive elements.
-- **Club Management Robustness**:
-  - **Add Button**: Moved the "Add New Club" button from a floating fixed position to a dedicated card at the bottom of the list. This ensures it is always visible and clickable regardless of viewport simulation or mobile browser chrome.
-  - **Delete Action**: Fixed a bug where clicking the delete icon would trigger the parent "Edit" event. Added `e.stopPropagation()` and improved `window.confirm` reliability.
-- **Build Compatibility**:
-  - Explicitly added `import React` to several TSX files to resolve "Cannot find namespace React" errors in specific build environments.
-- **UX Refinement**:
-  - Improved touch target sizes for all list-view actions (Edit/Delete).
+- **Interaction Bug Fix**: 
+  - Fixed an issue where long-pressing inside the dispersion ellipse (blue circle) had no reaction.
+  - Set `interactive: false` for decorative map layers (Ellipses, Guide Lines) to allow touch events to pass through to the map controller.
+- **State Synchronization**:
+  - Confirmed all current navigation and GPS logic is stable.
+- **Deferred Fixes**:
+  - The coordinate offset issue for marker dragging in rotated maps remains on the backlog for the next session per user request.
 
-## Version: V7.11.0 (Real-Time GPS & Precision)
-**Date:** 2024-06-02
+## Version: V7.13.0 (GPS Logic Stabilization & State Sync)
+**Date:** 2024-06-04
 **Branch:** `main`
-**Status:** ✅ RELEASED
+**Status:** ✅ ARCHIVED
 
-### Features
-- **Zero-Latency GPS (Background Tracking)**: 
-  - Switched from single-request `getCurrentPosition` to continuous `watchPosition`.
-  - The GPS hardware now "warms up" as soon as the map loads, ensuring that when the user taps "Record Shot" or "GPS Tee", the coordinate is available instantly without the previous 2-5 second delay.
-- **Live Location Confidence**:
-  - Added a **Pulsing Blue Dot** on the map to show real-time user location relative to the course.
-  - Added a **Signal Strength Indicator** (Bars + Accuracy in meters) to the top header. Users can now see if their GPS lock is precise (Green/High) before recording a shot.
-- **Manual Measurement Correction**:
-  - In Measurement Mode, the start point (User Location) is now **draggable**.
-- **UX Refinement**:
-  - Increased the touch target size for the draggable measurement handle (48x48px hit area).
+### Features & Fixes
+- **GPS Interaction Fixes**:
+  - Re-implemented `handleGPSButtonStart` and `handleGPSButtonEnd` to fix ReferenceErrors in the mobile HUD.
+  - Corrected long-press logic for updating the Tee position via the GPS button.
+- **Annotation Logic Fixes**:
+  - Re-introduced `deleteAnnotation` logic with confirmation dialogs.
+  - Fixed event propagation issues when clicking/long-pressing annotations in "Note Mode".
 
 [... remainder of previous logs ...]
