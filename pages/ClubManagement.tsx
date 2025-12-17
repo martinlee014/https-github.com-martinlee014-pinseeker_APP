@@ -1,8 +1,7 @@
-
-import { useState, useContext, useEffect, useRef } from 'react';
+import React, { useState, useContext } from 'react';
 import { AppContext } from '../App';
 import { ClubStats } from '../types';
-import { ChevronLeft, Plus, Trash2, Save, X, Edit3, RotateCcw } from 'lucide-react';
+import { ChevronLeft, Plus, Trash2, Save, Edit3, RotateCcw } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { StorageService } from '../services/storage';
 
@@ -10,8 +9,9 @@ const ClubManagement = () => {
   const { bag, updateBag, useYards } = useContext(AppContext);
   const navigate = useNavigate();
   const location = useLocation();
-  const [editingClub, setEditingClub] = useState<ClubStats | null>(null);
-  const [isNew, setIsNew] = useState(false);
+  
+  // State to track editing: null = List Mode, -1 = New Club, 0..N = Edit Index
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
   // Check if we came from an active game
   const fromGame = location.state?.fromGame;
@@ -22,63 +22,91 @@ const ClubManagement = () => {
   const [sideError, setSideError] = useState(0);
   const [depthError, setDepthError] = useState(0);
 
-  const openEditor = (club: ClubStats, isNewClub: boolean = false) => {
-    setEditingClub(club);
-    setIsNew(isNewClub);
-    setName(club.name);
-    setCarry(club.carry);
-    setSideError(club.sideError);
-    setDepthError(club.depthError);
+  const initForm = (club?: ClubStats) => {
+      if (club) {
+          setName(club.name);
+          setCarry(club.carry);
+          setSideError(club.sideError);
+          setDepthError(club.depthError);
+      } else {
+          // Defaults for new club
+          setName('New Club');
+          setCarry(150);
+          setSideError(15);
+          setDepthError(10);
+      }
+  };
+
+  const handleEdit = (index: number) => {
+      initForm(bag[index]);
+      setActiveIndex(index);
+  };
+
+  const handleAdd = () => {
+      initForm(); 
+      setActiveIndex(-1);
   };
 
   const handleBack = () => {
-      if (fromGame) {
-          // IMPORTANT: Return to play mode and signal to restore state
-          navigate('/play?restore=true');
+      if (activeIndex !== null) {
+          setActiveIndex(null);
       } else {
-          navigate(-1);
+          if (fromGame) {
+              navigate('/play?restore=true');
+          } else {
+              navigate(-1);
+          }
       }
   };
 
   const handleSave = () => {
     if (!name.trim()) return;
 
-    const newClub: ClubStats = {
-      name,
+    const newClubData: ClubStats = {
+      name: name.trim(),
       carry: Number(carry),
       sideError: Number(sideError),
       depthError: Number(depthError)
     };
 
+    // Create a fresh copy of the bag to trigger React updates
     let newBag = [...bag];
-    if (isNew) {
-      newBag.push(newClub);
-      // Sort by carry distance descending
-      newBag.sort((a, b) => b.carry - a.carry);
-    } else {
-      // Find index of editingClub in original bag (assuming name was unique-ish, or just map)
-      // Since we don't have IDs, we map by the object reference we stored in editingClub
-      // Or safer: map index. But here we can filter out the old one and add new one.
-      const index = bag.findIndex(c => c === editingClub);
-      if (index !== -1) {
-        newBag[index] = newClub;
+
+    if (activeIndex === -1) {
+      // Add New
+      newBag.push(newClubData);
+    } else if (activeIndex !== null) {
+      // Edit Existing
+      if (newBag[activeIndex]) {
+          newBag[activeIndex] = newClubData;
       }
-      newBag.sort((a, b) => b.carry - a.carry);
     }
+
+    // Sort by carry distance descending (Driver at top)
+    newBag.sort((a, b) => b.carry - a.carry);
 
     updateBag(newBag);
-    setEditingClub(null);
+    setActiveIndex(null);
   };
 
-  const handleDelete = (club: ClubStats) => {
-    if (confirm(`Remove ${club.name} from your bag?`)) {
-      const newBag = bag.filter(c => c !== club);
-      updateBag(newBag);
-    }
+  const handleDelete = (index: number, e: React.MouseEvent) => {
+    // Explicitly stop propagation and default behavior
+    e.stopPropagation();
+    e.preventDefault();
+
+    const clubName = bag[index]?.name || 'Club';
+    // Use a small timeout to ensure UI is responsive before confirm (helps in some mobile webviews)
+    setTimeout(() => {
+        if (window.confirm(`Remove ${clubName} from your bag?`)) {
+          const newBag = bag.filter((_, i) => i !== index);
+          updateBag(newBag);
+          if (activeIndex === index) setActiveIndex(null);
+        }
+    }, 10);
   };
 
   const handleReset = () => {
-    if (confirm("Reset all clubs to default values?")) {
+    if (window.confirm("Reset all clubs to default values?")) {
         const defaults = StorageService.resetBag();
         updateBag(defaults);
     }
@@ -90,46 +118,26 @@ const ClubManagement = () => {
 
   // --- Visualizer Component ---
   const DispersionVisualizer = () => {
-    // Reduced size for better mobile fit
     const width = 220;
     const height = 220;
     const centerX = width / 2;
     const centerY = height / 2;
-    const scale = 2; // 1 meter = 2 pixels (fits 50m radius in 100px)
+    const scale = 2; 
 
-    // Grid lines
     const gridLines = [];
-    const step = 10; // 10 meters/yards lines for cleaner look at smaller scale
+    const step = 10; 
     const maxDist = 50; 
 
     for (let i = -maxDist; i <= maxDist; i += step) {
         const pos = i * scale;
-        // Vertical
         gridLines.push(
-            <line 
-                key={`v${i}`} 
-                x1={centerX + pos} y1={0} 
-                x2={centerX + pos} y2={height} 
-                stroke={i === 0 ? "#4b5563" : "#374151"} 
-                strokeWidth={i === 0 ? 2 : 1}
-                strokeDasharray={i === 0 ? "" : "4 4"}
-            />
+            <line key={`v${i}`} x1={centerX + pos} y1={0} x2={centerX + pos} y2={height} stroke={i === 0 ? "#4b5563" : "#374151"} strokeWidth={i === 0 ? 2 : 1} strokeDasharray={i === 0 ? "" : "4 4"} />
         );
-        // Horizontal
         gridLines.push(
-            <line 
-                key={`h${i}`} 
-                x1={0} y1={centerY + pos} 
-                x2={width} y2={centerY + pos} 
-                stroke={i === 0 ? "#4b5563" : "#374151"} 
-                strokeWidth={i === 0 ? 2 : 1}
-                strokeDasharray={i === 0 ? "" : "4 4"}
-            />
+            <line key={`h${i}`} x1={0} y1={centerY + pos} x2={width} y2={centerY + pos} stroke={i === 0 ? "#4b5563" : "#374151"} strokeWidth={i === 0 ? 2 : 1} strokeDasharray={i === 0 ? "" : "4 4"} />
         );
     }
 
-    // Ellipse dimensions (converted to pixels)
-    // sideError is radius X, depthError is radius Y
     const rx = sideError * scale;
     const ry = depthError * scale;
 
@@ -138,27 +146,11 @@ const ClubManagement = () => {
             <div className="relative border border-gray-700 rounded-lg overflow-hidden bg-gray-900" style={{ width, height }}>
                 <svg width={width} height={height}>
                     {gridLines}
-                    {/* Target Center */}
                     <circle cx={centerX} cy={centerY} r={3} fill="#fbbf24" stroke="white" strokeWidth={1.5} />
-                    
-                    {/* Dispersion Ellipse */}
-                    <ellipse 
-                        cx={centerX} 
-                        cy={centerY} 
-                        rx={Math.max(2, rx)} 
-                        ry={Math.max(2, ry)} 
-                        fill="rgba(59, 130, 246, 0.3)" 
-                        stroke="#3b82f6" 
-                        strokeWidth={2} 
-                    />
-                    
-                    {/* Labels */}
+                    <ellipse cx={centerX} cy={centerY} rx={Math.max(2, rx)} ry={Math.max(2, ry)} fill="rgba(59, 130, 246, 0.3)" stroke="#3b82f6" strokeWidth={2} />
                     <text x={centerX + width/2 - 18} y={centerY - 5} fill="gray" fontSize="9">{maxDist}{unit}</text>
                     <text x={centerX + 5} y={12} fill="gray" fontSize="9">{maxDist}{unit}</text>
                 </svg>
-                <div className="absolute bottom-1 right-2 text-[9px] text-gray-500">
-                    Grid: {step}{unit}
-                </div>
             </div>
             <div className="mt-2 text-center text-xs text-blue-400 font-bold">
                 &plusmn;{displayVal(sideError)}{unit} &times; &plusmn;{displayVal(depthError)}{unit}
@@ -167,24 +159,31 @@ const ClubManagement = () => {
     )
   };
 
-  if (editingClub) {
+  // --- EDITOR VIEW ---
+  if (activeIndex !== null) {
+    const isNew = activeIndex === -1;
     return (
-        <div className="flex flex-col h-full bg-gray-900">
+        <div className="flex flex-col h-full bg-gray-900 relative">
             <div className="flex items-center justify-between p-4 pb-2 shrink-0">
-                <button onClick={() => setEditingClub(null)} className="p-2 bg-gray-800 rounded-lg">
+                <button onClick={() => setActiveIndex(null)} className="p-2 bg-gray-800 rounded-lg">
                     <ChevronLeft className="text-white" />
                 </button>
                 <h1 className="text-xl font-bold text-white">{isNew ? 'New Club' : 'Edit Club'}</h1>
-                <div className="w-10"></div>
+                
+                {!isNew ? (
+                    <button onClick={(e) => handleDelete(activeIndex, e)} className="p-2 bg-red-900/30 text-red-400 rounded-lg hover:bg-red-900/50">
+                        <Trash2 size={20} />
+                    </button>
+                ) : (
+                    <div className="w-10"></div>
+                )}
             </div>
 
             <div className="flex-1 overflow-y-auto relative">
-                {/* Visualizer - Sticky Top */}
                 <div className="sticky top-0 z-20 bg-gray-900/95 backdrop-blur-md border-b border-gray-800/50 pb-4 pt-2 px-4 shadow-xl flex justify-center">
                     <DispersionVisualizer />
                 </div>
 
-                {/* Form Controls */}
                 <div className="p-4 space-y-4">
                     <div className="space-y-5 bg-gray-800 p-4 rounded-xl border border-gray-700">
                         <div>
@@ -244,7 +243,7 @@ const ClubManagement = () => {
                 </div>
             </div>
 
-            <div className="p-4 pt-2 shrink-0 bg-gray-900">
+            <div className="p-4 pt-2 shrink-0 bg-gray-900 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
                 <button 
                     onClick={handleSave}
                     className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-green-900/20"
@@ -256,22 +255,23 @@ const ClubManagement = () => {
     );
   }
 
+  // --- LIST VIEW ---
   return (
-    <div className="p-4 flex flex-col h-full">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-4 flex flex-col h-full bg-gray-900 relative">
+      <div className="flex items-center justify-between mb-6 shrink-0">
         <button onClick={handleBack} className="p-2 bg-gray-800 rounded-lg">
           <ChevronLeft className="text-white" />
         </button>
-        <h1 className="text-2xl font-bold text-white">{fromGame ? 'Edit Bag (In Game)' : 'My Bag'}</h1>
+        <h1 className="text-2xl font-bold text-white">{fromGame ? 'Edit Bag' : 'My Bag'}</h1>
         <button onClick={handleReset} className="p-2 bg-gray-800 rounded-lg text-gray-400 hover:text-white">
            <RotateCcw size={20} />
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto space-y-3 pb-20">
+      <div className="flex-1 overflow-y-auto space-y-3 pb-8">
         {bag.map((club, idx) => (
-            <div key={idx} className="bg-gray-800 p-4 rounded-xl border border-gray-700 flex items-center justify-between">
-                <div>
+            <div key={idx} className="bg-gray-800 p-4 rounded-xl border border-gray-700 flex items-center justify-between group active:scale-[0.99] transition-transform">
+                <div onClick={() => handleEdit(idx)} className="flex-1 cursor-pointer">
                     <div className="text-lg font-black text-white">{club.name}</div>
                     <div className="text-sm text-green-400 font-bold">{displayVal(club.carry)}{unit} Carry</div>
                     <div className="text-[10px] text-gray-500 mt-1">
@@ -280,29 +280,30 @@ const ClubManagement = () => {
                 </div>
                 <div className="flex items-center gap-2">
                     <button 
-                        onClick={() => openEditor(club, false)}
-                        className="p-2 bg-blue-900/30 text-blue-400 rounded-lg hover:bg-blue-900/50"
+                        onClick={() => handleEdit(idx)}
+                        className="p-3 bg-blue-900/20 text-blue-400 rounded-lg hover:bg-blue-900/40"
                     >
-                        <Edit3 size={18} />
+                        <Edit3 size={20} />
                     </button>
                     <button 
-                        onClick={() => handleDelete(club)}
-                        className="p-2 bg-red-900/30 text-red-400 rounded-lg hover:bg-red-900/50"
+                        onClick={(e) => handleDelete(idx, e)}
+                        className="p-3 bg-red-900/20 text-red-400 rounded-lg hover:bg-red-900/40"
                     >
-                        <Trash2 size={18} />
+                        <Trash2 size={20} />
                     </button>
                 </div>
             </div>
         ))}
+        
+        {/* ADD BUTTON AS A LIST ITEM - No positioning issues */}
+        <button 
+          onClick={handleAdd}
+          className="w-full bg-gray-800/50 border-2 border-dashed border-gray-700 p-4 rounded-xl flex items-center justify-center gap-2 text-gray-400 hover:text-white hover:border-green-500/50 hover:bg-gray-800 transition-all min-h-[80px]"
+        >
+          <Plus size={24} />
+          <span className="font-bold">Add New Club</span>
+        </button>
       </div>
-
-      <button 
-        onClick={() => openEditor({ name: 'New Club', carry: 150, sideError: 15, depthError: 10 }, true)}
-        className="fixed right-6 bg-green-600 text-white p-4 rounded-full shadow-xl shadow-green-900/50 hover:scale-105 transition-transform"
-        style={{ bottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}
-      >
-        <Plus size={24} />
-      </button>
     </div>
   );
 };

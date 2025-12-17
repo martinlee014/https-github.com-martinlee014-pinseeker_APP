@@ -1204,7 +1204,10 @@ const PlayRound = () => {
   };
 
   return (
-    <div className="h-full relative bg-gray-900 flex flex-col overflow-hidden">
+    <div 
+        className="h-full relative bg-gray-900 flex flex-col overflow-hidden select-none"
+        onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
+    >
       {/* Map Area */}
       <div className="absolute inset-0 z-0 bg-black w-full h-full overflow-hidden">
         {/* Fixed: Use large sizing instead of scaling to ensure coverage of corners when rotated on all aspect ratios */}

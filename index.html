@@ -32,10 +32,16 @@
         background: #000;
       }
       /* Prevent long-press save image popup on iOS/Android */
-      img, svg {
+      * {
         -webkit-touch-callout: none;
         -webkit-user-select: none;
         user-select: none;
+      }
+      input, textarea {
+        -webkit-user-select: text;
+        user-select: text;
+      }
+      img, svg {
         pointer-events: auto; /* Allow events unless explicitly disabled */
       }
       /* Leaflet specific fix for vectors */
