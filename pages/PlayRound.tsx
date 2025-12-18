@@ -307,7 +307,6 @@ const RotatedMapHandler = ({
 
       const target = e.target as HTMLElement;
       // Refinement: Only block long-press if specifically touching a known interactive marker UI 
-      // (like draggable measure pins or notes). Decorative overlays are excluded.
       const isBlocked = target.closest('.leaflet-marker-draggable') || target.closest('.leaflet-popup-pane');
       
       if (!isBlocked) {
@@ -330,7 +329,6 @@ const RotatedMapHandler = ({
 
       const currentPos = getClientPos(e);
       if (startClientPos.current) {
-          // Increased movement tolerance for mobile long-press stability
           const moveDist = Math.sqrt(Math.pow(currentPos.x - startClientPos.current.x, 2) + Math.pow(currentPos.y - startClientPos.current.y, 2));
           if (moveDist > 20) { 
               hasMovedSignificantly.current = true;
@@ -362,7 +360,6 @@ const RotatedMapHandler = ({
       }
       if (startClientPos.current && !hasMovedSignificantly.current) {
          const target = e.target as HTMLElement;
-         // Allow map click only if not touching a marker
          const isMarker = target.closest('.leaflet-marker-icon');
          if (!isMarker) {
              const latlng = calculateLatLng(startClientPos.current);
@@ -710,8 +707,16 @@ const PlayRound = () => {
 
   const loadHole = (idx: number) => {
     setCurrentHoleIdx(idx);
-    setCurrentBallPos(activeCourse.holes[idx].tee);
-    setShotNum(1); setAimAngle(0); setMeasureTarget(null); setIsMeasureMode(false); setIsNoteMode(false); setShowHoleSelect(false);
+    const h = activeCourse.holes[idx];
+    if (isReplay) {
+        // Find shots for this hole or default to tee
+        setCurrentBallPos(h.tee);
+    } else {
+        setCurrentBallPos(h.tee);
+        setShotNum(1); 
+        setAimAngle(0);
+    }
+    setMeasureTarget(null); setIsMeasureMode(false); setIsNoteMode(false); setShowHoleSelect(false);
   };
 
   const finishRound = () => {
@@ -768,6 +773,24 @@ const PlayRound = () => {
               )}
               {holeShots.map((s, i) => (
                   <Fragment key={i}>
+                      {/* Analysis Overlay: Original Strategy (Dispersion and Path) */}
+                      {isReplay && s.plannedInfo && (
+                        <>
+                          <Polygon 
+                            positions={MathUtils.getEllipsePoints(
+                                s.plannedInfo.target, 
+                                s.plannedInfo.dispersion.width, 
+                                s.plannedInfo.dispersion.depth, 
+                                s.plannedInfo.dispersion.rotation
+                            ).map(p => [p.lat, p.lng] as [number, number])} 
+                            pathOptions={{ color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.1, weight: 1, dashArray: '2, 4', interactive: false, className: 'pointer-events-none' }} 
+                          />
+                          <Polyline 
+                            positions={[[s.from.lat, s.from.lng], [s.plannedInfo.target.lat, s.plannedInfo.target.lng]]} 
+                            pathOptions={{ color: "#3b82f6", weight: 1, dashArray: "5, 5", opacity: 0.3, interactive: false, className: 'pointer-events-none' }} 
+                          />
+                        </>
+                      )}
                       <Marker position={[s.from.lat, s.from.lng]} icon={s.shotNumber === 1 ? startMarkerIcon : ballIcon} />
                       <Polyline positions={MathUtils.getArcPoints(s.from, s.to).map(p => [p.lat, p.lng])} pathOptions={{ color: "white", weight: 2, opacity: 0.8, interactive: false }} />
                       {isReplay ? <Marker position={[s.to.lat, s.to.lng]} icon={createReplayLabelIcon(`${s.clubUsed} - ${MathUtils.formatDistance(s.distance, useYards)}`, -mapRotation)} /> : <Marker position={[s.to.lat, s.to.lng]} icon={targetIcon} eventHandlers={{ contextmenu: (e) => { e.originalEvent.preventDefault(); setShotToDelete(s); } }} />}
@@ -778,7 +801,6 @@ const PlayRound = () => {
                       <Marker position={[currentBallPos.lat, currentBallPos.lng]} icon={shotNum === 1 ? startMarkerIcon : ballIcon} />
                       <Polyline positions={[[currentBallPos.lat, currentBallPos.lng], [predictedLanding.lat, predictedLanding.lng]]} pathOptions={{ color: "#3b82f6", weight: 3, dashArray: "5, 5", interactive: false, className: 'pointer-events-none' }} />
                       <Polygon positions={ellipsePoints} pathOptions={{ color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.2, weight: 1, interactive: false, className: 'pointer-events-none' }} />
-                      {/* CRITICAL: Ensure interactive={false} to avoid capturing long-press events on predicted landing area */}
                       <Marker position={[predictedLanding.lat, predictedLanding.lng]} icon={createArrowIcon(shotBearing)} interactive={false} />
                       <Polyline positions={guideLinePoints as any} pathOptions={{ color: "#fbbf24", weight: 2, dashArray: "4, 6", opacity: 0.8, interactive: false, className: 'pointer-events-none' }} />
                       <Marker position={[guideLabelPos.lat, guideLabelPos.lng]} icon={createDistanceLabelIcon(`Leaves ${MathUtils.formatDistance(distLandingToGreen, useYards)}`, -mapRotation)} interactive={false} />
@@ -801,10 +823,12 @@ const PlayRound = () => {
         <div className="pointer-events-auto flex flex-col gap-2">
            <button onClick={() => navigate(-1)} className="bg-black/50 p-2 rounded-full text-white backdrop-blur-md border border-white/5"><ChevronLeft size={20} /></button>
            <button onClick={() => navigate('/dashboard')} className="bg-black/50 p-2 rounded-full text-white backdrop-blur-md border border-white/5"><Home size={20} /></button>
-           {!isReplay && <><button onClick={() => navigate('/settings/clubs', { state: { fromGame: true } })} className="bg-black/50 p-2 rounded-full text-white backdrop-blur-md border border-white/5 mt-1"><GolfBagIcon size={20} /></button><button onClick={() => setShowHoleSelect(true)} className="bg-black/50 p-2 rounded-full text-white backdrop-blur-md border border-white/5 mt-1"><Grid size={20} /></button><button onClick={() => setShowFullCard(true)} className="bg-black/50 p-2 rounded-full text-white backdrop-blur-md border border-white/5 mt-1"><ListChecks size={20} /></button></>}
+           {!isReplay && <button onClick={() => navigate('/settings/clubs', { state: { fromGame: true } })} className="bg-black/50 p-2 rounded-full text-white backdrop-blur-md border border-white/5 mt-1"><GolfBagIcon size={20} /></button>}
+           <button onClick={() => setShowHoleSelect(true)} className="bg-black/50 p-2 rounded-full text-white backdrop-blur-md border border-white/5 mt-1"><Grid size={20} /></button>
+           {!isReplay && <button onClick={() => setShowFullCard(true)} className="bg-black/50 p-2 rounded-full text-white backdrop-blur-md border border-white/5 mt-1"><ListChecks size={20} /></button>}
         </div>
         <div className="text-center mt-1 drop-shadow-lg pointer-events-none">
-          <div className="flex items-center justify-center gap-1.5 mb-1 opacity-80">{isReplay ? <span className="text-[10px] text-gray-400 bg-black/60 px-2 rounded-md">REPLAY</span> : <div className="flex items-center gap-1 bg-black/60 px-2 py-0.5 rounded-md backdrop-blur-md">{gpsSignalLevel === 3 ? <Signal size={14} className="text-blue-500" /> : <SignalLow size={14} className="text-red-500" />}<span className="text-[10px] font-mono text-gray-300">{gpsAccuracy ? `±${Math.round(gpsAccuracy)}m` : 'NO GPS'}</span></div>}</div>
+          <div className="flex items-center justify-center gap-1.5 mb-1 opacity-80">{isReplay ? <span className="text-[10px] text-gray-400 bg-black/60 px-2 rounded-md font-black tracking-widest">ANALYSIS</span> : <div className="flex items-center gap-1 bg-black/60 px-2 py-0.5 rounded-md backdrop-blur-md">{gpsSignalLevel === 3 ? <Signal size={14} className="text-blue-500" /> : <SignalLow size={14} className="text-red-500" />}<span className="text-[10px] font-mono text-gray-300">{gpsAccuracy ? `±${Math.round(gpsAccuracy)}m` : 'NO GPS'}</span></div>}</div>
           <h2 className="text-2xl font-black text-white">HOLE {hole.number}</h2>
           <div className="flex items-center justify-center gap-2 text-xs font-bold bg-black/60 rounded-full px-3 py-1 backdrop-blur-md border border-white/10 shadow-lg"><span className="text-gray-300">PAR {hole.par}</span><span className="text-gray-500">|</span><span className="text-white">{MathUtils.formatDistance(distToGreen, useYards)}</span></div>
         </div>
@@ -813,6 +837,31 @@ const PlayRound = () => {
         </div>
       </div>
       {showWind && <div className="absolute top-20 right-14 z-[1000] bg-black/90 backdrop-blur-xl p-4 rounded-2xl border border-gray-700 w-48 text-gray-300 shadow-2xl flex flex-col gap-4"><div className="flex items-center justify-between border-b border-gray-800 pb-2"><span className="font-bold text-white text-sm flex items-center gap-2"><Wind size={16}/> Wind</span><span className="text-xs bg-blue-900/50 text-blue-300 px-2 py-0.5 rounded">{windSpeed} m/s</span></div><input type="range" min="0" max="20" value={windSpeed} onChange={(e) => setWindSpeed(parseInt(e.target.value))} className="w-full accent-blue-500 h-2 bg-gray-700 rounded-lg appearance-none" /><div className="relative w-32 h-32 mx-auto select-none touch-none" onMouseDown={handleWindCircleInteract} onMouseMove={(e) => e.buttons === 1 && handleWindCircleInteract(e)} onTouchMove={handleWindCircleInteract}><div className="absolute inset-0 rounded-full border-2 border-gray-700 bg-gray-800/50 shadow-inner"></div><div className="absolute inset-0 flex items-center justify-center pointer-events-none transition-transform" style={{ transform: `rotate(${windDir - baseBearing}deg)` }}><div className="relative h-full w-full"><div className="absolute top-2 left-1/2 -translate-x-1/2"><div className="w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-b-[20px] border-b-blue-500"></div><div className="w-1 h-14 bg-blue-500 mx-auto opacity-80"></div></div></div></div><div className="absolute top-1/2 left-1/2 w-4 h-4 bg-gray-200 rounded-full border-2 border-gray-600 -translate-x-1/2 -translate-y-1/2 shadow-lg z-10"></div></div></div>}
+      
+      {/* Review Mode Navigation HUD */}
+      {isReplay && (
+        <div className="absolute bottom-0 w-full z-30 pt-2 px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] flex justify-between items-center bg-gradient-to-t from-black/90 via-black/60 to-transparent">
+            <button 
+                onClick={() => loadHole(Math.max(0, currentHoleIdx - 1))}
+                disabled={currentHoleIdx === 0}
+                className="bg-gray-800/80 p-4 rounded-2xl text-white disabled:opacity-20 flex items-center gap-2 border border-white/5 active:scale-95 transition-all shadow-xl"
+            >
+                <ArrowLeft size={20}/> <span className="font-bold text-xs uppercase tracking-widest">Prev</span>
+            </button>
+            <div className="text-center px-4 py-2 rounded-xl bg-black/40 backdrop-blur-md border border-white/5">
+                <div className="text-[9px] text-gray-500 font-black uppercase tracking-[0.2em] mb-0.5">Hole Stats</div>
+                <div className="text-white font-bold text-sm">{holeShots.length} Shots <span className="text-gray-500 mx-1">|</span> Par {hole.par}</div>
+            </div>
+            <button 
+                onClick={() => loadHole(Math.min(activeCourse.holes.length - 1, currentHoleIdx + 1))}
+                disabled={currentHoleIdx === activeCourse.holes.length - 1}
+                className="bg-gray-800/80 p-4 rounded-2xl text-white disabled:opacity-20 flex items-center gap-2 border border-white/5 active:scale-95 transition-all shadow-xl"
+            >
+                <span className="font-bold text-xs uppercase tracking-widest">Next</span> <ArrowRight size={20}/>
+            </button>
+        </div>
+      )}
+
       {!isReplay && !isNoteMode && (
         <div className="absolute bottom-0 w-full z-30 pt-2 px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] bg-gradient-to-t from-black/95 via-black/80 to-transparent">
             {isMeasureMode ? (
