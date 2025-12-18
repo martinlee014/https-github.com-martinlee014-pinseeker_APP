@@ -306,7 +306,6 @@ const RotatedMapHandler = ({
       startClientPos.current = pos;
 
       const target = e.target as HTMLElement;
-      // Refinement: Only block long-press if specifically touching a known interactive marker UI 
       const isBlocked = target.closest('.leaflet-marker-draggable') || target.closest('.leaflet-popup-pane');
       
       if (!isBlocked) {
@@ -708,11 +707,8 @@ const PlayRound = () => {
   const loadHole = (idx: number) => {
     setCurrentHoleIdx(idx);
     const h = activeCourse.holes[idx];
-    if (isReplay) {
-        // Find shots for this hole or default to tee
-        setCurrentBallPos(h.tee);
-    } else {
-        setCurrentBallPos(h.tee);
+    setCurrentBallPos(h.tee);
+    if (!isReplay) {
         setShotNum(1); 
         setAimAngle(0);
     }
@@ -773,7 +769,6 @@ const PlayRound = () => {
               )}
               {holeShots.map((s, i) => (
                   <Fragment key={i}>
-                      {/* Analysis Overlay: Original Strategy (Dispersion and Path) */}
                       {isReplay && s.plannedInfo && (
                         <>
                           <Polygon 
@@ -838,7 +833,6 @@ const PlayRound = () => {
       </div>
       {showWind && <div className="absolute top-20 right-14 z-[1000] bg-black/90 backdrop-blur-xl p-4 rounded-2xl border border-gray-700 w-48 text-gray-300 shadow-2xl flex flex-col gap-4"><div className="flex items-center justify-between border-b border-gray-800 pb-2"><span className="font-bold text-white text-sm flex items-center gap-2"><Wind size={16}/> Wind</span><span className="text-xs bg-blue-900/50 text-blue-300 px-2 py-0.5 rounded">{windSpeed} m/s</span></div><input type="range" min="0" max="20" value={windSpeed} onChange={(e) => setWindSpeed(parseInt(e.target.value))} className="w-full accent-blue-500 h-2 bg-gray-700 rounded-lg appearance-none" /><div className="relative w-32 h-32 mx-auto select-none touch-none" onMouseDown={handleWindCircleInteract} onMouseMove={(e) => e.buttons === 1 && handleWindCircleInteract(e)} onTouchMove={handleWindCircleInteract}><div className="absolute inset-0 rounded-full border-2 border-gray-700 bg-gray-800/50 shadow-inner"></div><div className="absolute inset-0 flex items-center justify-center pointer-events-none transition-transform" style={{ transform: `rotate(${windDir - baseBearing}deg)` }}><div className="relative h-full w-full"><div className="absolute top-2 left-1/2 -translate-x-1/2"><div className="w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-b-[20px] border-b-blue-500"></div><div className="w-1 h-14 bg-blue-500 mx-auto opacity-80"></div></div></div></div><div className="absolute top-1/2 left-1/2 w-4 h-4 bg-gray-200 rounded-full border-2 border-gray-600 -translate-x-1/2 -translate-y-1/2 shadow-lg z-10"></div></div></div>}
       
-      {/* Review Mode Navigation HUD */}
       {isReplay && (
         <div className="absolute bottom-0 w-full z-30 pt-2 px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] flex justify-between items-center bg-gradient-to-t from-black/90 via-black/60 to-transparent">
             <button 
