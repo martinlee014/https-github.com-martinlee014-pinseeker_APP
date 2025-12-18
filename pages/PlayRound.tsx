@@ -306,11 +306,11 @@ const RotatedMapHandler = ({
       startClientPos.current = pos;
 
       const target = e.target as HTMLElement;
-      // We check if the clicked target is interactive. If we set interactive={false} on decorations,
-      // this check correctly fails, allowing the long press to trigger.
-      const isInteractive = target.closest('.leaflet-interactive') || target.closest('.leaflet-popup-pane');
+      // Refinement: Only block long-press if specifically touching a known interactive marker UI 
+      // (like draggable measure pins or notes). Decorative overlays are excluded.
+      const isBlocked = target.closest('.leaflet-marker-draggable') || target.closest('.leaflet-popup-pane');
       
-      if (!isInteractive) {
+      if (!isBlocked) {
           longPressTimer.current = setTimeout(() => {
               isDragging.current = false;
               if (!hasMovedSignificantly.current && !isMultiTouch.current) {
@@ -330,8 +330,9 @@ const RotatedMapHandler = ({
 
       const currentPos = getClientPos(e);
       if (startClientPos.current) {
+          // Increased movement tolerance for mobile long-press stability
           const moveDist = Math.sqrt(Math.pow(currentPos.x - startClientPos.current.x, 2) + Math.pow(currentPos.y - startClientPos.current.y, 2));
-          if (moveDist > 10) { 
+          if (moveDist > 20) { 
               hasMovedSignificantly.current = true;
               if (longPressTimer.current) clearTimeout(longPressTimer.current);
           }
@@ -361,8 +362,9 @@ const RotatedMapHandler = ({
       }
       if (startClientPos.current && !hasMovedSignificantly.current) {
          const target = e.target as HTMLElement;
-         const isInteractive = target.closest('.leaflet-interactive') || target.closest('.leaflet-popup-pane');
-         if (!isInteractive) {
+         // Allow map click only if not touching a marker
+         const isMarker = target.closest('.leaflet-marker-icon');
+         if (!isMarker) {
              const latlng = calculateLatLng(startClientPos.current);
              onClick({ lat: latlng.lat, lng: latlng.lng });
          }
@@ -774,12 +776,11 @@ const PlayRound = () => {
               {!isReplay && !isMeasureMode && !isNoteMode && (
                   <>
                       <Marker position={[currentBallPos.lat, currentBallPos.lng]} icon={shotNum === 1 ? startMarkerIcon : ballIcon} />
-                      <Polyline positions={[[currentBallPos.lat, currentBallPos.lng], [predictedLanding.lat, predictedLanding.lng]]} pathOptions={{ color: "#3b82f6", weight: 3, dashArray: "5, 5", interactive: false }} />
-                      <Polygon positions={ellipsePoints} pathOptions={{ color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.2, weight: 1, interactive: false }} />
-                      {/* CRITICAL: Set interactive={false} on Arrow Icon to prevent capture of long-press events */}
+                      <Polyline positions={[[currentBallPos.lat, currentBallPos.lng], [predictedLanding.lat, predictedLanding.lng]]} pathOptions={{ color: "#3b82f6", weight: 3, dashArray: "5, 5", interactive: false, className: 'pointer-events-none' }} />
+                      <Polygon positions={ellipsePoints} pathOptions={{ color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.2, weight: 1, interactive: false, className: 'pointer-events-none' }} />
+                      {/* CRITICAL: Ensure interactive={false} to avoid capturing long-press events on predicted landing area */}
                       <Marker position={[predictedLanding.lat, predictedLanding.lng]} icon={createArrowIcon(shotBearing)} interactive={false} />
-                      <Polyline positions={guideLinePoints as any} pathOptions={{ color: "#fbbf24", weight: 2, dashArray: "4, 6", opacity: 0.8, interactive: false }} />
-                      {/* CRITICAL: Set interactive={false} on Distance Labels to prevent capture of long-press events */}
+                      <Polyline positions={guideLinePoints as any} pathOptions={{ color: "#fbbf24", weight: 2, dashArray: "4, 6", opacity: 0.8, interactive: false, className: 'pointer-events-none' }} />
                       <Marker position={[guideLabelPos.lat, guideLabelPos.lng]} icon={createDistanceLabelIcon(`Leaves ${MathUtils.formatDistance(distLandingToGreen, useYards)}`, -mapRotation)} interactive={false} />
                   </>
               )}
@@ -787,8 +788,8 @@ const PlayRound = () => {
                   <>
                       <Marker position={[currentBallPos.lat, currentBallPos.lng]} icon={draggableMeasureStartIcon} draggable={true} eventHandlers={{ dragend: (e) => setCurrentBallPos(e.target.getLatLng()) }} zIndexOffset={1000} />
                       <Marker position={[activeMeasureTarget.lat, activeMeasureTarget.lng]} icon={measureTargetIcon} />
-                      <Polyline positions={[[currentBallPos.lat, currentBallPos.lng], [activeMeasureTarget.lat, activeMeasureTarget.lng]]} pathOptions={{ color: "#60a5fa", weight: 4, opacity: 1, interactive: false }} />
-                      <Polyline positions={[[activeMeasureTarget.lat, activeMeasureTarget.lng], [hole.green.lat, hole.green.lng]]} pathOptions={{ color: "#ffffff", weight: 3, dashArray: "8, 8", opacity: 0.8, interactive: false }} />
+                      <Polyline positions={[[currentBallPos.lat, currentBallPos.lng], [activeMeasureTarget.lat, activeMeasureTarget.lng]]} pathOptions={{ color: "#60a5fa", weight: 4, opacity: 1, interactive: false, className: 'pointer-events-none' }} />
+                      <Polyline positions={[[activeMeasureTarget.lat, activeMeasureTarget.lng], [hole.green.lat, hole.green.lng]]} pathOptions={{ color: "#ffffff", weight: 3, dashArray: "8, 8", opacity: 0.8, interactive: false, className: 'pointer-events-none' }} />
                       <Marker position={[labelPos1.lat, labelPos1.lng]} icon={createDistanceLabelIcon(MathUtils.formatDistance(measureDist1, useYards), -mapRotation, '#60a5fa')} interactive={false} />
                       <Marker position={[labelPos2.lat, labelPos2.lng]} icon={createDistanceLabelIcon(MathUtils.formatDistance(measureDist2, useYards), -mapRotation, '#ffffff')} interactive={false} />
                   </>
