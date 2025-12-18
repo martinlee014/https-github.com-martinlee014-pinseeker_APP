@@ -306,10 +306,10 @@ const RotatedMapHandler = ({
       startClientPos.current = pos;
 
       const target = e.target as HTMLElement;
+      // We check if the clicked target is interactive. If we set interactive={false} on decorations,
+      // this check correctly fails, allowing the long press to trigger.
       const isInteractive = target.closest('.leaflet-interactive') || target.closest('.leaflet-popup-pane');
       
-      // CRITICAL: isInteractive is true if we touch a marker, but if we touch the dispersion polygon (now set to interactive: false), 
-      // it should fall through here correctly.
       if (!isInteractive) {
           longPressTimer.current = setTimeout(() => {
               isDragging.current = false;
@@ -776,9 +776,11 @@ const PlayRound = () => {
                       <Marker position={[currentBallPos.lat, currentBallPos.lng]} icon={shotNum === 1 ? startMarkerIcon : ballIcon} />
                       <Polyline positions={[[currentBallPos.lat, currentBallPos.lng], [predictedLanding.lat, predictedLanding.lng]]} pathOptions={{ color: "#3b82f6", weight: 3, dashArray: "5, 5", interactive: false }} />
                       <Polygon positions={ellipsePoints} pathOptions={{ color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.2, weight: 1, interactive: false }} />
-                      <Marker position={[predictedLanding.lat, predictedLanding.lng]} icon={createArrowIcon(shotBearing)} />
+                      {/* CRITICAL: Set interactive={false} on Arrow Icon to prevent capture of long-press events */}
+                      <Marker position={[predictedLanding.lat, predictedLanding.lng]} icon={createArrowIcon(shotBearing)} interactive={false} />
                       <Polyline positions={guideLinePoints as any} pathOptions={{ color: "#fbbf24", weight: 2, dashArray: "4, 6", opacity: 0.8, interactive: false }} />
-                      <Marker position={[guideLabelPos.lat, guideLabelPos.lng]} icon={createDistanceLabelIcon(`Leaves ${MathUtils.formatDistance(distLandingToGreen, useYards)}`, -mapRotation)} />
+                      {/* CRITICAL: Set interactive={false} on Distance Labels to prevent capture of long-press events */}
+                      <Marker position={[guideLabelPos.lat, guideLabelPos.lng]} icon={createDistanceLabelIcon(`Leaves ${MathUtils.formatDistance(distLandingToGreen, useYards)}`, -mapRotation)} interactive={false} />
                   </>
               )}
               {!isReplay && isMeasureMode && activeMeasureTarget && (
@@ -787,8 +789,8 @@ const PlayRound = () => {
                       <Marker position={[activeMeasureTarget.lat, activeMeasureTarget.lng]} icon={measureTargetIcon} />
                       <Polyline positions={[[currentBallPos.lat, currentBallPos.lng], [activeMeasureTarget.lat, activeMeasureTarget.lng]]} pathOptions={{ color: "#60a5fa", weight: 4, opacity: 1, interactive: false }} />
                       <Polyline positions={[[activeMeasureTarget.lat, activeMeasureTarget.lng], [hole.green.lat, hole.green.lng]]} pathOptions={{ color: "#ffffff", weight: 3, dashArray: "8, 8", opacity: 0.8, interactive: false }} />
-                      <Marker position={[labelPos1.lat, labelPos1.lng]} icon={createDistanceLabelIcon(MathUtils.formatDistance(measureDist1, useYards), -mapRotation, '#60a5fa')} />
-                      <Marker position={[labelPos2.lat, labelPos2.lng]} icon={createDistanceLabelIcon(MathUtils.formatDistance(measureDist2, useYards), -mapRotation, '#ffffff')} />
+                      <Marker position={[labelPos1.lat, labelPos1.lng]} icon={createDistanceLabelIcon(MathUtils.formatDistance(measureDist1, useYards), -mapRotation, '#60a5fa')} interactive={false} />
+                      <Marker position={[labelPos2.lat, labelPos2.lng]} icon={createDistanceLabelIcon(MathUtils.formatDistance(measureDist2, useYards), -mapRotation, '#ffffff')} interactive={false} />
                   </>
               )}
             </MapContainer>
