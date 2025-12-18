@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { HashRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { User, LogOut, Play, Map as MapIcon, Settings as SettingsIcon } from 'lucide-react';
@@ -17,13 +16,14 @@ import ClubManagement from './pages/ClubManagement';
 import CourseManager from './pages/CourseManager';
 import CourseEditor from './pages/CourseEditor';
 
-// Global Context for simple state sharing
 export const AppContext = createContext<{
   user: string | null;
   login: (u: string) => void;
   logout: () => void;
   useYards: boolean;
   toggleUnits: () => void;
+  hdcp: number;
+  updateHdcp: (val: number) => void;
   bag: ClubStats[];
   updateBag: (newBag: ClubStats[]) => void;
   showTutorial: boolean;
@@ -34,6 +34,8 @@ export const AppContext = createContext<{
   logout: () => {},
   useYards: false,
   toggleUnits: () => {},
+  hdcp: 15,
+  updateHdcp: () => {},
   bag: [],
   updateBag: () => {},
   showTutorial: false,
@@ -50,12 +52,11 @@ const MainLayout = ({ children }: { children?: ReactNode }) => {
 
   return (
     <div className="flex flex-col h-[100dvh] max-w-md mx-auto bg-black relative shadow-2xl overflow-hidden">
-      {/* Header */}
       {!isPlayMode && !isEditorMode && (
         <header className="flex items-center justify-between p-4 bg-gray-900 border-b border-gray-800 z-10 shrink-0">
           <div className="flex items-center gap-2" onClick={() => navigate('/dashboard')}>
             <MapIcon className="text-green-500" />
-            <span className="font-bold text-xl tracking-wider">PINSEEKER</span>
+            <span className="font-bold text-xl tracking-wider text-white">PINSEEKER</span>
           </div>
           <button onClick={logout} className="p-2 text-gray-400 hover:text-red-500">
             <LogOut size={20} />
@@ -63,12 +64,10 @@ const MainLayout = ({ children }: { children?: ReactNode }) => {
         </header>
       )}
 
-      {/* Content */}
       <main className="flex-1 overflow-y-auto relative">
         {children}
       </main>
 
-      {/* Bottom Nav - Hide in Play Mode or Editor Mode */}
       {!isPlayMode && !isEditorMode && (
         <nav className="flex justify-around items-center p-3 bg-gray-900 border-t border-gray-800 z-10 shrink-0 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
           <NavItem icon={<User size={24} />} label="Dash" path="/dashboard" active={location.pathname === '/dashboard'} />
@@ -103,13 +102,12 @@ const NavItem = ({ icon, label, path, active }: any) => {
 const App = () => {
   const [user, setUser] = useState<string | null>(StorageService.getCurrentUser());
   const [useYards, setUseYards] = useState<boolean>(StorageService.getUseYards());
+  const [hdcp, setHdcp] = useState<number>(StorageService.getHdcp());
   const [bag, setBag] = useState<ClubStats[]>([]);
   const [showTutorial, setShowTutorial] = useState(false);
 
-  // Load bag and check tutorial on mount
   useEffect(() => {
     setBag(StorageService.getBag());
-    // Onboarding should appear before user login if it's their first time visiting the app
     if (!StorageService.hasSeenOnboarding()) {
         setShowTutorial(true);
     }
@@ -131,6 +129,11 @@ const App = () => {
     StorageService.setUseYards(newVal);
   };
 
+  const updateHdcp = (val: number) => {
+      setHdcp(val);
+      StorageService.saveHdcp(val);
+  };
+
   const updateBag = (newBag: ClubStats[]) => {
     setBag(newBag);
     StorageService.saveBag(newBag);
@@ -142,7 +145,7 @@ const App = () => {
   };
 
   return (
-    <AppContext.Provider value={{ user, login, logout, useYards, toggleUnits, bag, updateBag, showTutorial, setShowTutorial }}>
+    <AppContext.Provider value={{ user, login, logout, useYards, toggleUnits, hdcp, updateHdcp, bag, updateBag, showTutorial, setShowTutorial }}>
       <HashRouter>
         {showTutorial && <Onboarding onClose={handleCloseTutorial} />}
         <Routes>

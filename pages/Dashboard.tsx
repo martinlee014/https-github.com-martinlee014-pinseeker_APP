@@ -1,15 +1,14 @@
-
 import { useContext, useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppContext } from '../App';
 import { StorageService } from '../services/storage';
 import { RoundHistory, GolfCourse } from '../types';
 import * as MathUtils from '../services/mathUtils';
-import { Plus, ChevronRight, Trophy, Calendar, MapPin, Play, RefreshCw, X } from 'lucide-react';
-import { ModalOverlay } from '../components/Modals';
+import { Plus, ChevronRight, Trophy, Calendar, MapPin, Play, RefreshCw, X, Edit2 } from 'lucide-react';
+import { ModalOverlay, HdcpInputModal, ConfirmClubSyncModal } from '../components/Modals';
 
 const Dashboard = () => {
-  const { user } = useContext(AppContext);
+  const { user, hdcp, updateHdcp, updateBag } = useContext(AppContext);
   const navigate = useNavigate();
   const [history, setHistory] = useState<RoundHistory[]>([]);
   const [showResumeModal, setShowResumeModal] = useState(false);
@@ -17,13 +16,17 @@ const Dashboard = () => {
   const [availableCourses, setAvailableCourses] = useState<GolfCourse[]>([]);
   const [loadingLocation, setLoadingLocation] = useState(false);
   
+  // HDCP Edit flow
+  const [showHdcpEdit, setShowHdcpEdit] = useState(false);
+  const [showSyncConfirm, setShowSyncConfirm] = useState(false);
+  const [pendingHdcp, setPendingHdcp] = useState<number | null>(null);
+
   const checkRun = useRef(false);
 
   useEffect(() => {
     if (user) {
       setHistory(StorageService.getHistory(user));
       
-      // Check for resume game only once on mount
       if (!checkRun.current) {
         checkRun.current = true;
         const tempState = StorageService.getTempState(user);
@@ -35,17 +38,14 @@ const Dashboard = () => {
   }, [user, navigate]);
 
   const handleStartClick = () => {
-    // Load courses
     const allCourses = StorageService.getAllCourses();
     setAvailableCourses(allCourses);
     setShowCourseSelect(true);
     setLoadingLocation(true);
 
-    // Try to sort by location
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition((pos) => {
             const userLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-            
             const sorted = [...allCourses].sort((a, b) => {
                 const distA = MathUtils.calculateDistance(userLoc, a.holes[0].tee);
                 const distB = MathUtils.calculateDistance(userLoc, b.holes[0].tee);
@@ -54,7 +54,7 @@ const Dashboard = () => {
             setAvailableCourses(sorted);
             setLoadingLocation(false);
         }, () => {
-            setLoadingLocation(false); // GPS failed, keep default order
+            setLoadingLocation(false); 
         });
     } else {
         setLoadingLocation(false);
@@ -62,7 +62,6 @@ const Dashboard = () => {
   };
 
   const selectCourse = (course: GolfCourse) => {
-    // If user explicitly clicks Start New, and we still have a temp state, clear it.
     if (user) {
        StorageService.clearTempState(user);
     }
@@ -72,9 +71,32 @@ const Dashboard = () => {
 
   const resumeRound = () => {
     setShowResumeModal(false);
-    // When resuming, we need to load the course data associated with that save if possible
-    // For now, the PlayRound logic handles restoring state, but we assume the course data is embedded or static
     navigate('/play?restore=true');
+  };
+
+  const handleHdcpSave = (newVal: number) => {
+      setShowHdcpEdit(false);
+      setPendingHdcp(newVal);
+      setShowSyncConfirm(true);
+  };
+
+  const confirmHdcpSync = () => {
+      if (pendingHdcp !== null) {
+          updateHdcp(pendingHdcp);
+          const autoBag = MathUtils.generateClubsFromHdcp(pendingHdcp);
+          updateBag(autoBag);
+          if (navigator.vibrate) navigator.vibrate(100);
+      }
+      setShowSyncConfirm(false);
+      setPendingHdcp(null);
+  };
+
+  const cancelHdcpSync = () => {
+      if (pendingHdcp !== null) {
+          updateHdcp(pendingHdcp);
+      }
+      setShowSyncConfirm(false);
+      setPendingHdcp(null);
   };
 
   const calculateTotalScore = (round: RoundHistory) => {
@@ -82,7 +104,7 @@ const Dashboard = () => {
   };
 
   const getScoreColor = (score: number) => {
-    const par = 72; // Assuming standard par 72 for total
+    const par = 72; 
     if (score < par) return 'text-red-400';
     if (score === par) return 'text-white';
     return 'text-green-400';
@@ -95,9 +117,13 @@ const Dashboard = () => {
           <h2 className="text-gray-400 text-sm font-medium">WELCOME BACK</h2>
           <h1 className="text-2xl font-bold text-white">{user}</h1>
         </div>
-        <div className="bg-gray-800 px-3 py-1 rounded text-xs text-gray-300">
-          HDCP: <span className="text-white font-bold">12.4</span>
-        </div>
+        <button 
+            onClick={() => setShowHdcpEdit(true)}
+            className="bg-gray-800 px-3 py-2 rounded-lg text-xs text-gray-300 flex items-center gap-2 hover:bg-gray-700 active:scale-95 transition-all border border-gray-700"
+        >
+          HDCP: <span className="text-white font-bold text-sm">{hdcp}</span>
+          <Edit2 size={12} className="text-gray-500" />
+        </button>
       </div>
 
       <button
@@ -155,6 +181,22 @@ const Dashboard = () => {
         )}
       </div>
 
+      {showHdcpEdit && (
+          <HdcpInputModal 
+            currentHdcp={hdcp} 
+            onSave={handleHdcpSave} 
+            onClose={() => setShowHdcpEdit(false)} 
+          />
+      )}
+
+      {showSyncConfirm && pendingHdcp !== null && (
+          <ConfirmClubSyncModal 
+            hdcp={pendingHdcp} 
+            onConfirm={confirmHdcpSync} 
+            onCancel={cancelHdcpSync} 
+          />
+      )}
+
       {showCourseSelect && (
         <ModalOverlay onClose={() => setShowCourseSelect(false)}>
             <div className="p-4 border-b border-gray-800 flex justify-between items-center bg-gray-900 shrink-0">
@@ -163,12 +205,10 @@ const Dashboard = () => {
                 </h3>
                 <button type="button" onClick={() => setShowCourseSelect(false)}><X className="text-gray-400" /></button>
             </div>
-            
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
                 {loadingLocation && (
                     <div className="text-center text-xs text-gray-500 animate-pulse mb-2">Locating nearest courses...</div>
                 )}
-                
                 {availableCourses.map((course, idx) => (
                     <button
                         key={course.id}
@@ -186,7 +226,6 @@ const Dashboard = () => {
                         </div>
                     </button>
                 ))}
-
                 <button
                     onClick={() => navigate('/settings/courses/edit')}
                     className="w-full bg-gray-900/50 hover:bg-gray-800 border border-dashed border-gray-700 p-4 rounded-xl flex items-center justify-center gap-2 text-gray-400 hover:text-white transition-all mt-4"
@@ -203,19 +242,11 @@ const Dashboard = () => {
              <Trophy className="mx-auto text-yellow-500 mb-4" size={48} />
              <h2 className="text-xl font-bold text-white mb-2">Unfinished Round Found</h2>
              <p className="text-gray-400 mb-6 text-sm">You have an active round in progress. Would you like to continue where you left off?</p>
-             
              <div className="space-y-3">
-               <button 
-                  onClick={resumeRound}
-                  className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2"
-               >
+               <button onClick={resumeRound} className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2">
                  <Play size={20} fill="white" /> Resume Round
                </button>
-               
-               <button 
-                  onClick={() => { setShowResumeModal(false); handleStartClick(); }}
-                  className="w-full bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold py-3 rounded-xl flex items-center justify-center gap-2"
-               >
+               <button onClick={() => { setShowResumeModal(false); handleStartClick(); }} className="w-full bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold py-3 rounded-xl flex items-center justify-center gap-2">
                  <RefreshCw size={20} /> Start New Round
                </button>
              </div>

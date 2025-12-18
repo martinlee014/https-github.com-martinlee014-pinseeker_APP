@@ -33,10 +33,20 @@ const UserManual = () => {
         </p>
 
         <Section 
+          title="HDCP & Skill Modeling (Auto-Bag)"
+          items={[
+            '**New:** If you are unsure of your exact dispersion data, tap the "HDCP" button on the Dashboard.',
+            'Enter your current handicap and choose to "Auto-Configure Bag."',
+            'PinSeeker will generate a logically consistent 14-club bag with Carry distances and Scatter patterns (width/depth) tuned to your skill level.',
+            'Higher handicaps will show larger ellipses to help you plan for more realistic "miss" scenarios.'
+          ]}
+        />
+
+        <Section 
           title="Measurement Mode (Rangefinder)"
           items={[
             'Tap the Ruler icon (top right) to enter measurement mode.',
-            '**New:** Tap the "MY LOC" button at the bottom to instantly snap the measurement start point to your current GPS position.',
+            'Tap the "MY LOC" button at the bottom to instantly snap the measurement start point to your current GPS position.',
             'Tap anywhere else on the map to measure from your current ball position to that specific point (layup point).',
             'The dashboard displays two distances: "From You" (Start to Target) and "To Pin" (Target to Green).'
           ]}
@@ -48,7 +58,7 @@ const UserManual = () => {
             'Tap the Pen icon (top right) to toggle Annotation Mode.',
             '**Toolbar:** Select Text (T), Flag (Pin), or Draw (Highlighter).',
             '**Draw:** Tap points to create a path, then tap "Finish Line" to save.',
-            '**Delete:** Select the Eraser (Red Icon) from the toolbar and tap any annotation to delete it instantly. Alternatively, long-press any annotation (without the Eraser) to verify deletion.'
+            '**Delete:** Select the Eraser (Red Icon) from the toolbar and tap any annotation to delete it instantly.'
           ]}
         />
 
@@ -56,8 +66,8 @@ const UserManual = () => {
           title="Wind Vane"
           items={[
              'Tap the Wind icon to open the compass overlay.',
-             'Drag the ring to align the "N" indicator with true North (or simply align the wind arrow relative to your shot).',
-             'The blue arrow visualizes the wind flow direction across the hole.'
+             'Drag the ring to align the arrow with the current wind direction.',
+             'The map will automatically adjust your predicted landing spot based on headwind or crosswind components.'
           ]}
         />
 
@@ -66,26 +76,17 @@ const UserManual = () => {
           items={[
             '**Record Shot:** Walk to your ball and tap the GPS button (bottom right) to save the shot landing spot.',
             '**Move Tee Box:** Long-press (>1 sec) the GPS button to update the *start* position (Tee) to your current location.',
-            '**Manual Drop:** If GPS is weak, long-press anywhere on the map to manually drop your ball location.',
-            '**Undo:** Long-press the yellow shot marker on the map to delete the most recent shot and reset your position.'
+            '**Manual Drop:** Long-press anywhere on the map to manually drop your ball location without GPS.',
+            '**Undo:** Long-press any yellow shot marker on the map during a round to delete that shot.'
           ]}
         />
 
         <Section 
-          title="Course Management"
+          title="Course & Club Management"
           items={[
-            'Go to Settings > Course Database to view or add new courses.',
-            'Use the Course Editor to map Tee Boxes and Greens for custom courses.',
-            'Verify Par and Total Distance in the summary screen before saving.'
-          ]}
-        />
-
-        <Section 
-          title="Club Management"
-          items={[
-            'Go to Settings > Club Management to customize your golf bag.',
-            'Use the "Network Table" visualizer to define your dispersion (Width/Depth scatter).',
-            'The blue ellipse on the map represents your likely landing zone based on these settings.'
+            'Go to Settings > Course Database to view or add new custom courses.',
+            'Go to Settings > Club Management to manually fine-tune individual clubs if you have launch monitor data.',
+            'The blue ellipse on the map represents your statistical landing zone—always try to keep the whole ellipse in the safe zone!'
           ]}
         />
       </div>

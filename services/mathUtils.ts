@@ -1,4 +1,3 @@
-
 import { LatLng, ClubStats } from '../types';
 
 const EARTH_RADIUS = 6378137.0; // Meters
@@ -64,11 +63,9 @@ export const calculateWindAdjustedShot = (
   const relativeWindAngle = (windDir - bearing + 180) % 360;
   const windRad = toRad(relativeWindAngle);
   
-  // Simple physics model
   const headWindComp = windSpeed * Math.cos(windRad);
   const crossWindComp = windSpeed * Math.sin(windRad);
   
-  // Effect coefficients (simplified)
   const distEffect = headWindComp * 0.01 * baseDistance; 
   const sideEffect = crossWindComp * 0.005 * baseDistance;
   
@@ -94,7 +91,6 @@ export const getEllipsePoints = (center: LatLng, width: number, height: number, 
     const rx = dx * Math.cos(rotationRad) - dy * Math.sin(rotationRad);
     const ry = dx * Math.sin(rotationRad) + dy * Math.cos(rotationRad);
     
-    // Convert back to LatLng (approximate using meters to degrees)
     const dLat = ry / EARTH_RADIUS;
     const dLon = rx / (EARTH_RADIUS * Math.cos(toRad(center.lat)));
     
@@ -106,38 +102,22 @@ export const getEllipsePoints = (center: LatLng, width: number, height: number, 
   return points;
 };
 
-// Generate curved points for trajectory (Quadratic Bezier)
 export const getArcPoints = (start: LatLng, end: LatLng): LatLng[] => {
   const points: LatLng[] = [];
   const numPoints = 20;
-  
-  // Calculate a control point to create the curve
-  // We place it at the midpoint, offset slightly to the side to simulate a visual arc
-  // For a "vertical" flight look on a 2D map, standard convention is just a straight line
-  // But user requested "arc/curve". We will do a slight "Draw" shape (curve left).
-  
   const midLat = (start.lat + end.lat) / 2;
   const midLng = (start.lng + end.lng) / 2;
-  
-  // Create an offset perpendicular to the path
   const bearing = calculateBearing(start, end);
   const dist = calculateDistance(start, end);
-  
-  // Offset depends on distance. E.g. 5% of distance.
   const offsetMeters = dist * 0.1; 
-  
-  // Control point is midpoint shifted 90 degrees relative to bearing
-  // Visual effect: A slight curve
   const controlPoint = calculateDestination({lat: midLat, lng: midLng}, offsetMeters, bearing - 90);
 
   for (let i = 0; i <= numPoints; i++) {
     const t = i / numPoints;
-    // Quadratic Bezier: B(t) = (1-t)^2 * P0 + 2(1-t)t * P1 + t^2 * P2
     const lat = (1 - t) * (1 - t) * start.lat + 2 * (1 - t) * t * controlPoint.lat + t * t * end.lat;
     const lng = (1 - t) * (1 - t) * start.lng + 2 * (1 - t) * t * controlPoint.lng + t * t * end.lng;
     points.push({ lat, lng });
   }
-  
   return points;
 };
 
@@ -148,51 +128,61 @@ export const formatDistance = (meters: number, useYards: boolean): string => {
   return `${Math.round(meters)}m`;
 };
 
-// --- STRATEGY ALGORITHMS ---
-
 /**
- * Calculates the optimal two-shot strategy to reach a target.
- * It favors combinations that minimize total side error (dispersion).
+ * Generates a full golf bag configuration based on handicap.
+ * Logic: Higher HDCP = Lower distance, Higher lateral & depth scatter.
  */
+export const generateClubsFromHdcp = (hdcp: number): ClubStats[] => {
+    // 0 HDCP Baseline
+    const baseline = [
+        { name: "Driver", carry: 250, sideRate: 0.06, depthRate: 0.04 },
+        { name: "3 Wood", carry: 230, sideRate: 0.06, depthRate: 0.04 },
+        { name: "3 Hybrid", carry: 210, sideRate: 0.07, depthRate: 0.05 },
+        { name: "4 Iron", carry: 195, sideRate: 0.07, depthRate: 0.05 },
+        { name: "5 Iron", carry: 185, sideRate: 0.08, depthRate: 0.06 },
+        { name: "6 Iron", carry: 175, sideRate: 0.08, depthRate: 0.06 },
+        { name: "7 Iron", carry: 165, sideRate: 0.09, depthRate: 0.07 },
+        { name: "8 Iron", carry: 155, sideRate: 0.09, depthRate: 0.07 },
+        { name: "9 Iron", carry: 145, sideRate: 0.10, depthRate: 0.08 },
+        { name: "PW", carry: 130, sideRate: 0.10, depthRate: 0.08 },
+        { name: "AW", carry: 115, sideRate: 0.11, depthRate: 0.09 },
+        { name: "SW", carry: 100, sideRate: 0.12, depthRate: 0.10 },
+        { name: "LW", carry: 85, sideRate: 0.13, depthRate: 0.11 },
+        { name: "Putter", carry: 30, sideRate: 0.03, depthRate: 0.03 },
+    ];
+
+    // Scaling Factors
+    // Max reduction at 30 HDCP is about 25% of distance.
+    const distFactor = 1 - (Math.min(30, hdcp) * 0.008); 
+    // Max scatter increase at 30 HDCP is 250% higher than baseline.
+    const scatterFactor = 1 + (Math.min(30, hdcp) * 0.08);
+
+    return baseline.map(c => ({
+        name: c.name,
+        carry: Math.round(c.carry * distFactor),
+        sideError: Math.round(c.carry * distFactor * c.sideRate * scatterFactor),
+        depthError: Math.round(c.carry * distFactor * c.depthRate * scatterFactor)
+    }));
+};
+
 export const calculateLayupStrategy = (
   distanceToGreen: number,
   bag: ClubStats[],
   shotNum: number
 ): { club1: ClubStats; club2: ClubStats; totalSideError: number } | null => {
-  
-  // 1. Filter valid clubs for the first shot
-  // If shot > 1 (fairway/rough), exclude Driver (and maybe Putter)
   let validClubs1 = bag;
   if (shotNum > 1) {
-      // Case-insensitive check
       validClubs1 = bag.filter(c => !c.name.toLowerCase().includes('driver') && !c.name.toLowerCase().includes('putter'));
   }
-
-  // 2. Filter valid clubs for second shot (usually anything except Driver)
   const validClubs2 = bag.filter(c => !c.name.toLowerCase().includes('driver'));
-
   let bestPair = null;
-  // We initialize with a high "badness" score.
-  // Badness = Total Side Error (Risk) + Weight * Excess Distance (we don't want to fly the green too much)
   let minRiskScore = Infinity;
 
-  // 3. Iterate all pairs
   for (const c1 of validClubs1) {
       for (const c2 of validClubs2) {
           const totalCarry = c1.carry + c2.carry;
-          
-          // Must reach the green (with a small tolerance, e.g., -5m is okay if it rolls)
           if (totalCarry >= distanceToGreen - 5) {
-             
-             // Metric: Total Side Dispersion (Width)
-             // We want the tightest combined dispersion.
              const totalSideError = c1.sideError + c2.sideError;
-             
-             // We can also penalize if the total carry is WAY over the green (uncontrolled)
-             // But usually you just club down on the second shot. 
-             // Let's assume the user hits a full shot for C1 and a controlled shot for C2.
-             // So we primarily optimize for lowest combined side error.
-             
              if (totalSideError < minRiskScore) {
                  minRiskScore = totalSideError;
                  bestPair = { club1: c1, club2: c2, totalSideError };
@@ -200,7 +190,6 @@ export const calculateLayupStrategy = (
           }
       }
   }
-
   return bestPair;
 };
 
@@ -214,26 +203,12 @@ export const getStrategyRecommendation = (
   const val = useYards ? distanceToGreen * 1.09361 : distanceToGreen;
   const dist = Math.round(val);
 
-  if (distanceToGreen < 5) {
-      return { mainAction: "Tap-In Range", subAction: "Excellent Shot!" };
-  }
-  if (distanceToGreen < 20) {
-      return { mainAction: "Short Game", subAction: "Up & Down probability high" };
-  }
-  if (distanceToGreen >= 80 && distanceToGreen <= 110) {
-      return { mainAction: "Perfect Layup", subAction: `Leaves full wedge (${dist}${unit})` };
-  }
+  if (distanceToGreen < 5) return { mainAction: "Tap-In Range", subAction: "Excellent Shot!" };
+  if (distanceToGreen < 20) return { mainAction: "Short Game", subAction: "Up & Down probability high" };
+  if (distanceToGreen >= 80 && distanceToGreen <= 110) return { mainAction: "Perfect Layup", subAction: `Leaves full wedge (${dist}${unit})` };
   
-  // Check for layup strategy if distance is very long
-  // We use a simplified check here, the caller usually handles the specific club names
   const maxCarry = bag[0].carry;
-  if (shotNum > 1 && distanceToGreen > maxCarry) {
-      return { mainAction: "Layup Required", subAction: "Check recommended combo" };
-  }
-
-  if (shotNum === 1 && distanceToGreen > 220) {
-      return { mainAction: "Safe Drive", subAction: "Focus on fairway hit" };
-  }
-  
+  if (shotNum > 1 && distanceToGreen > maxCarry) return { mainAction: "Layup Required", subAction: "Check recommended combo" };
+  if (shotNum === 1 && distanceToGreen > 220) return { mainAction: "Safe Drive", subAction: "Focus on fairway hit" };
   return { mainAction: "Approach", subAction: `Leaves ${dist}${unit} to pin` };
 };

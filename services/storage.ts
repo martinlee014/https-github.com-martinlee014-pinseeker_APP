@@ -1,4 +1,3 @@
-
 import { RoundHistory, ClubStats, GolfCourse, MapAnnotation } from "../types";
 import { DEFAULT_BAG, DUVENHOF_COURSE } from "../constants";
 
@@ -8,6 +7,7 @@ const KEY_CLUB_BAG = 'pinseeker_club_bag';
 const KEY_CUSTOM_COURSES = 'pinseeker_custom_courses';
 const KEY_ANNOTATIONS = 'pinseeker_map_annotations';
 const KEY_HAS_SEEN_ONBOARDING = 'pinseeker_has_seen_v793_onboarding';
+const KEY_HDCP = 'pinseeker_user_hdcp';
 
 export const StorageService = {
   getCurrentUser: (): string | null => {
@@ -28,6 +28,15 @@ export const StorageService = {
 
   setUseYards: (useYards: boolean) => {
     localStorage.setItem(KEY_SETTINGS_UNIT, useYards ? 'yards' : 'meters');
+  },
+
+  getHdcp: (): number => {
+    const val = localStorage.getItem(KEY_HDCP);
+    return val ? parseFloat(val) : 15.0; // Default to 15
+  },
+
+  saveHdcp: (hdcp: number) => {
+    localStorage.setItem(KEY_HDCP, hdcp.toString());
   },
 
   // --- Onboarding ---
@@ -112,7 +121,6 @@ export const StorageService = {
     const filtered = all.filter(a => a.id !== noteId);
     localStorage.setItem(KEY_ANNOTATIONS, JSON.stringify(filtered));
   },
-  // -----------------------
 
   saveHistory: (username: string, history: RoundHistory) => {
     const key = `history_${username}`;
@@ -128,7 +136,6 @@ export const StorageService = {
     return str ? JSON.parse(str) : [];
   },
   
-  // Temp game state for recovery
   saveTempState: (username: string, state: any) => {
     localStorage.setItem(`temp_game_${username}`, JSON.stringify(state));
   },
