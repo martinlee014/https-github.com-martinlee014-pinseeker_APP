@@ -69,17 +69,17 @@ const MainLayout = ({ children }: { children?: ReactNode }) => {
       </main>
 
       {!isPlayMode && !isEditorMode && (
-        <nav className="flex justify-around items-center p-3 bg-gray-900 border-t border-gray-800 z-10 shrink-0 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
-          <NavItem icon={<User size={24} />} label="Dash" path="/dashboard" active={location.pathname === '/dashboard'} />
-          <div className="relative -top-5">
-             <button 
-               onClick={() => navigate('/play')}
-               className="bg-green-600 p-4 rounded-full shadow-lg shadow-green-900/50 hover:scale-105 transition-transform border-4 border-black"
-             >
-               <Play fill="white" className="text-white ml-1" />
-             </button>
-          </div>
-          <NavItem icon={<SettingsIcon size={24} />} label="Settings" path="/settings" active={location.pathname === '/settings'} />
+        <nav className="fixed bottom-4 left-1/2 -translate-x-1/2 w-[90%] flex justify-around items-center p-2 bg-gray-900/60 backdrop-blur-xl border border-white/10 rounded-2xl z-[1000] shadow-2xl">
+          <NavItem icon={<User size={20} />} label="Dash" path="/dashboard" active={location.pathname === '/dashboard'} />
+          
+          <button 
+            onClick={() => navigate('/play')}
+            className="bg-green-600 p-3 rounded-xl shadow-lg shadow-green-900/40 hover:scale-105 transition-transform border border-white/10 -mt-2"
+          >
+            <Play size={20} fill="white" className="text-white ml-0.5" />
+          </button>
+          
+          <NavItem icon={<SettingsIcon size={20} />} label="Settings" path="/settings" active={location.pathname === '/settings'} />
         </nav>
       )}
     </div>
@@ -91,10 +91,10 @@ const NavItem = ({ icon, label, path, active }: any) => {
   return (
     <button 
       onClick={() => navigate(path)}
-      className={`flex flex-col items-center gap-1 ${active ? 'text-green-400' : 'text-gray-500'}`}
+      className={`flex flex-col items-center gap-0.5 px-4 py-1 rounded-xl transition-all ${active ? 'text-green-400 bg-white/5' : 'text-gray-500 hover:text-gray-300'}`}
     >
       {icon}
-      <span className="text-xs">{label}</span>
+      <span className="text-[10px] font-bold uppercase tracking-tighter">{label}</span>
     </button>
   );
 }

@@ -111,7 +111,7 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="p-4 space-y-6">
+    <div className="p-4 space-y-6 pb-24">
       <div className="flex justify-between items-end">
         <div>
           <h2 className="text-gray-400 text-sm font-medium">WELCOME BACK</h2>

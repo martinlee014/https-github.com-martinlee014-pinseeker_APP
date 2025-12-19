@@ -1,4 +1,3 @@
-
 import React, { useContext, useEffect, useState } from 'react';
 import { AppContext } from '../App';
 import { BookOpen, Ruler, Briefcase, Download, Smartphone, Share, PlusSquare, Info, Map, MessageSquare, Send, X, Loader2, HelpCircle } from 'lucide-react';
@@ -93,7 +92,7 @@ const Settings = () => {
   };
 
   return (
-    <div className="p-4 space-y-6">
+    <div className="p-4 space-y-6 pb-24">
       <h1 className="text-2xl font-bold text-white mb-6">Settings</h1>
 
       <div className="space-y-4">
@@ -199,7 +198,7 @@ const Settings = () => {
       </div>
       
       <div className="text-center text-xs text-gray-600 mt-10">
-          PinSeeker Web v7.12.0
+          PinSeeker Web v7.17.0
       </div>
 
       {showInstallHelp && (
