@@ -160,7 +160,8 @@ const CourseEditor = () => {
             setMapCenter([myLat, myLng]);
             setIsLocating(false);
             try {
-                const nearby = await OsmService.findNearbyCourses(myLat, myLng);
+                // Calling discoverCourses with lat and lng
+                const nearby = await OsmService.discoverCourses({ lat: myLat, lng: myLng });
                 setDiscoveredCourses(nearby);
             } catch (e) {
                 console.error("Discovery failed", e);
@@ -183,7 +184,7 @@ const CourseEditor = () => {
       if (!courseName.trim()) return;
       setIsSearching(true);
       try {
-          const results = await OsmService.searchCoursesByName(courseName, countryCode);
+          const results = await OsmService.discoverCourses({ name: courseName, countryCode });
           setDiscoveredCourses(results);
           if (results.length === 0) alert("No matching courses found in selected country.");
       } catch (e) {
@@ -194,20 +195,17 @@ const CourseEditor = () => {
   };
 
   const selectDiscovered = async (c: DiscoveredCourse) => {
-      // Step 1: Show transitioning UI
       setIsMapTransitioning(true);
       setCourseName(c.name);
       setMapCenter([c.lat, c.lng]);
       
-      // Artificial short delay to allow state to settle before heavy map rendering
+      // Artificial short delay to allow UI to transition
       setTimeout(async () => {
           setStep('map');
-          setIsMapTransitioning(false);
           
-          // Step 2: Silent Background Auto-Fill
           setIsAutoFilling(true);
           try {
-              const foundHoles = await OsmService.fetchHoleData(c.lat, c.lng);
+              const foundHoles = await OsmService.fetchFullCourseMap(c.lat, c.lng);
               const holesWithData = foundHoles.filter(h => h.tee.lat !== 0 || h.green.lat !== 0).length;
               if (holesWithData > 0) {
                   setHoles(foundHoles);
@@ -218,15 +216,16 @@ const CourseEditor = () => {
               console.warn("Background satellite fill failed, continuing manually.");
           } finally {
               setIsAutoFilling(false);
+              setIsMapTransitioning(false);
           }
-      }, 300);
+      }, 500);
   };
 
   const handleAutoFill = async () => {
       if (isAutoFilling) return;
       setIsAutoFilling(true);
       try {
-          const foundHoles = await OsmService.fetchHoleData(mapCenter[0], mapCenter[1]);
+          const foundHoles = await OsmService.fetchFullCourseMap(mapCenter[0], mapCenter[1]);
           const holesWithData = foundHoles.filter(h => h.tee.lat !== 0 || h.green.lat !== 0).length;
           
           if (holesWithData === 0) {
@@ -310,6 +309,17 @@ const CourseEditor = () => {
     return { holeStats, totalDist, totalPar };
   }, [holes]);
 
+  const transitionOverlay = isMapTransitioning && (
+    <div className="fixed inset-0 z-[5000] bg-black/90 flex flex-col items-center justify-center p-8 backdrop-blur-md">
+        <div className="relative mb-6">
+          <Loader2 size={64} className="text-blue-500 animate-spin" />
+          <Globe size={24} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-white" />
+        </div>
+        <h2 className="text-xl font-black text-white tracking-widest uppercase mb-2">Analyzing Terrain</h2>
+        <p className="text-gray-400 text-sm text-center">Syncing with high-res satellite database for {courseName}...</p>
+    </div>
+  );
+
   if (step === 'info') {
       return (
           <div className="p-6 bg-gray-900 min-h-screen text-white flex flex-col pb-24">
@@ -376,8 +386,8 @@ const CourseEditor = () => {
                                   <div className="flex-1 min-w-0 pr-4">
                                       <div className="font-bold text-sm text-white truncate">{c.name}</div>
                                       <div className="text-[10px] text-gray-500 mt-1 flex items-center gap-2">
-                                          <span className="bg-gray-900 px-1.5 py-0.5 rounded border border-gray-800 text-blue-400">{c.tags["addr:city"] || "Course"}</span>
-                                          {c.tags["addr:country"] && <span className="text-gray-600">[{c.tags["addr:country"]}]</span>}
+                                          <span className="bg-gray-900 px-1.5 py-0.5 rounded border border-gray-700 text-blue-400">{c.city || "Course"}</span>
+                                          {c.country && <span className="text-gray-600">[{c.country}]</span>}
                                       </div>
                                   </div>
                                   <div className="bg-blue-600/10 p-2 rounded-lg group-hover:bg-blue-600 group-hover:text-white text-blue-500 transition-all">
@@ -388,24 +398,13 @@ const CourseEditor = () => {
                       </div>
                   </div>
               </div>
-
-              {/* Transition Loading Overlay */}
-              {isMapTransitioning && (
-                  <div className="fixed inset-0 z-[5000] bg-black/90 flex flex-col items-center justify-center p-8 backdrop-blur-md">
-                      <div className="relative mb-6">
-                        <Loader2 size={64} className="text-blue-500 animate-spin" />
-                        <Globe size={24} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-white" />
-                      </div>
-                      <h2 className="text-xl font-black text-white tracking-widest uppercase mb-2">Analyzing Terrain</h2>
-                      <p className="text-gray-400 text-sm text-center">Syncing with high-res satellite database for {courseName}...</p>
-                  </div>
-              )}
               
               <div className="mt-auto pt-4">
                   <button onClick={() => setStep('map')} className="w-full bg-gray-800 border border-gray-700 text-gray-400 font-bold py-4 rounded-xl text-sm uppercase tracking-widest flex items-center justify-center gap-2">
                       <Edit3 size={16}/> Skip to Manual Mapping
                   </button>
               </div>
+              {transitionOverlay}
           </div>
       );
   }
@@ -495,6 +494,7 @@ const CourseEditor = () => {
                 <div className="p-4 border-t border-gray-800 shrink-0 bg-gray-900 flex gap-3"><button onClick={() => setShowSummary(false)} className="flex-1 bg-gray-800 text-gray-300 font-bold py-3 rounded-xl border border-gray-700">Edit More</button><button onClick={handleFinalSave} className="flex-1 bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-xl shadow-lg">Save Course</button></div>
             </ModalOverlay>
         )}
+        {transitionOverlay}
     </div>
   );
 };

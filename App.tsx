@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { HashRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
-import { User, LogOut, Play, Map as MapIcon, Settings as SettingsIcon } from 'lucide-react';
+import { User, LogOut, Play, Map as MapIcon, Settings as SettingsIcon, Globe } from 'lucide-react';
 import { StorageService } from './services/storage';
 import { ClubStats } from './types';
 import Onboarding from './components/Onboarding';
@@ -15,6 +15,7 @@ import UserManual from './pages/UserManual';
 import ClubManagement from './pages/ClubManagement';
 import CourseManager from './pages/CourseManager';
 import CourseEditor from './pages/CourseEditor';
+import CourseDiscovery from './pages/CourseDiscovery'; // New Page
 
 export const AppContext = createContext<{
   user: string | null;
@@ -49,10 +50,11 @@ const MainLayout = ({ children }: { children?: ReactNode }) => {
 
   const isPlayMode = location.pathname.startsWith('/play');
   const isEditorMode = location.pathname.includes('/edit');
+  const isDiscoveryMode = location.pathname === '/discovery';
 
   return (
     <div className="flex flex-col h-[100dvh] max-w-md mx-auto bg-black relative shadow-2xl overflow-hidden">
-      {!isPlayMode && !isEditorMode && (
+      {!isPlayMode && !isEditorMode && !isDiscoveryMode && (
         <header className="flex items-center justify-between p-4 bg-gray-900 border-b border-gray-800 z-10 shrink-0">
           <div className="flex items-center gap-2" onClick={() => navigate('/dashboard')}>
             <MapIcon className="text-green-500" />
@@ -68,15 +70,15 @@ const MainLayout = ({ children }: { children?: ReactNode }) => {
         {children}
       </main>
 
-      {!isPlayMode && !isEditorMode && (
+      {!isPlayMode && !isEditorMode && !isDiscoveryMode && (
         <nav className="fixed bottom-4 left-1/2 -translate-x-1/2 w-[90%] flex justify-around items-center p-2 bg-gray-900/60 backdrop-blur-xl border border-white/10 rounded-2xl z-[1000] shadow-2xl">
           <NavItem icon={<User size={20} />} label="Dash" path="/dashboard" active={location.pathname === '/dashboard'} />
           
           <button 
-            onClick={() => navigate('/play')}
-            className="bg-green-600 p-3 rounded-xl shadow-lg shadow-green-900/40 hover:scale-105 transition-transform border border-white/10 -mt-2"
+            onClick={() => navigate('/discovery')}
+            className="bg-blue-600 p-3 rounded-xl shadow-lg shadow-blue-900/40 hover:scale-105 transition-transform border border-white/10 -mt-2"
           >
-            <Play size={20} fill="white" className="text-white ml-0.5" />
+            <Globe size={20} fill="white" className="text-white" />
           </button>
           
           <NavItem icon={<SettingsIcon size={20} />} label="Settings" path="/settings" active={location.pathname === '/settings'} />
@@ -151,6 +153,7 @@ const App = () => {
         <Routes>
           <Route path="/" element={user ? <Navigate to="/dashboard" /> : <Login />} />
           <Route path="/dashboard" element={<ProtectedRoute user={user}><MainLayout><Dashboard /></MainLayout></ProtectedRoute>} />
+          <Route path="/discovery" element={<ProtectedRoute user={user}><MainLayout><CourseDiscovery /></MainLayout></ProtectedRoute>} />
           <Route path="/play" element={<ProtectedRoute user={user}><MainLayout><PlayRound /></MainLayout></ProtectedRoute>} />
           <Route path="/summary" element={<ProtectedRoute user={user}><MainLayout><RoundSummary /></MainLayout></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute user={user}><MainLayout><Settings /></MainLayout></ProtectedRoute>} />

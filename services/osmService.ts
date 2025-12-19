@@ -5,92 +5,95 @@ export interface DiscoveredCourse {
   name: string;
   lat: number;
   lng: number;
-  tags: any;
+  country?: string;
+  city?: string;
+  holeCount?: number;
 }
 
 /**
- * OsmService uses the Overpass API to fetch golf course features.
+ * OsmService: The global discovery engine for golf infrastructure.
  */
 export const OsmService = {
   /**
-   * Finds golf course boundaries/centers within a radius
+   * Bulk search for courses nearby or by name/country
    */
-  findNearbyCourses: async (lat: number, lng: number, radiusMeters: number = 30000): Promise<DiscoveredCourse[]> => {
+  discoverCourses: async (params: { 
+    name?: string, 
+    countryCode?: string, 
+    lat?: number, 
+    lng?: number,
+    radius?: number 
+  }): Promise<DiscoveredCourse[]> => {
+    const { name, countryCode, lat, lng, radius = 50000 } = params;
+    
+    // Improved logic: Use Area filtering for countries instead of tag-based filtering
+    let areaDef = '';
+    if (countryCode) {
+      areaDef = `area["ISO3166-1"="${countryCode.toUpperCase()}"]->.searchArea;`;
+    }
+
+    let filter = '["leisure"="golf_course"]';
+    if (name) {
+      // Use case-insensitive regex for name search
+      filter += `["name"~"${name}",i]`;
+    }
+    
+    const scope = countryCode ? '(area.searchArea)' : (lat && lng ? `(around:${radius},${lat},${lng})` : '');
+    
     const query = `
-      [out:json][timeout:25];
+      [out:json][timeout:30];
+      ${areaDef}
       (
-        node["leisure"="golf_course"](around:${radiusMeters},${lat},${lng});
-        way["leisure"="golf_course"](around:${radiusMeters},${lat},${lng});
-        relation["leisure"="golf_course"](around:${radiusMeters},${lat},${lng});
+        node${filter}${scope};
+        way${filter}${scope};
+        relation${filter}${scope};
       );
       out center;
     `;
 
     const response = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`);
-    if (!response.ok) throw new Error("OSM Fetch Failed");
-    const data = await response.json();
+    if (!response.ok) throw new Error("OSM_SEARCH_ERROR");
     
+    const data = await response.json();
+    if (!data.elements) return [];
+
     return data.elements.map((el: any) => ({
       id: el.id.toString(),
       name: el.tags.name || "Unnamed Course",
       lat: el.lat || el.center.lat,
       lng: el.lon || el.center.lng,
-      tags: el.tags
+      country: el.tags["addr:country"] || countryCode,
+      city: el.tags["addr:city"] || el.tags["addr:suburb"] || el.tags["addr:province"],
+      holeCount: parseInt(el.tags.holes) || 18
     }));
   },
 
   /**
-   * Search for a course by name, optionally filtered by country code
+   * Deep fetch of all tees and greens within a course boundary
    */
-  searchCoursesByName: async (name: string, countryCode?: string): Promise<DiscoveredCourse[]> => {
-    const countryFilter = countryCode ? `["addr:country"="${countryCode.toUpperCase()}"]` : "";
+  fetchFullCourseMap: async (lat: number, lng: number, radius: number = 2000): Promise<GolfHole[]> => {
+    // We look for any golf-related nodes/ways in the immediate vicinity
     const query = `
-      [out:json][timeout:25];
+      [out:json][timeout:45];
       (
-        node["leisure"="golf_course"]["name"~"${name}",i]${countryFilter};
-        way["leisure"="golf_course"]["name"~"${name}",i]${countryFilter};
-        relation["leisure"="golf_course"]["name"~"${name}",i]${countryFilter};
+        node["golf"~"tee|green"](around:${radius},${lat},${lng});
+        way["golf"~"tee|green"](around:${radius},${lat},${lng});
       );
       out center;
     `;
 
     const response = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`);
-    if (!response.ok) throw new Error("OSM Fetch Failed");
-    const data = await response.json();
-    
-    return data.elements.map((el: any) => ({
-      id: el.id.toString(),
-      name: el.tags.name || "Unnamed Course",
-      lat: el.lat || el.center.lat,
-      lng: el.lon || el.center.lng,
-      tags: el.tags
-    }));
-  },
-
-  /**
-   * Fetch specific hole positions (tees/greens) for a selected course area
-   */
-  fetchHoleData: async (lat: number, lng: number, radiusMeters: number = 2000): Promise<GolfHole[]> => {
-    const query = `
-      [out:json][timeout:25];
-      (
-        node["golf"~"tee|green"](around:${radiusMeters},${lat},${lng});
-        way["golf"~"tee|green"](around:${radiusMeters},${lat},${lng});
-      );
-      out center;
-    `;
-
-    const response = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`);
-    if (!response.ok) throw new Error("OSM Fetch Failed");
+    if (!response.ok) throw new Error("OSM_HOLE_FETCH_ERROR");
     
     const data = await response.json();
-    const elements = data.elements;
+    const elements = data.elements || [];
 
     const tees: { [key: string]: LatLng } = {};
     const greens: { [key: string]: LatLng } = {};
 
     elements.forEach((el: any) => {
       const pos = { lat: el.lat || el.center.lat, lng: el.lon || el.center.lng };
+      // Some use 'ref', some use 'hole' tags in OSM
       const holeNum = el.tags.ref || el.tags.hole;
       const type = el.tags.golf;
 
@@ -101,10 +104,11 @@ export const OsmService = {
     });
 
     const holes: GolfHole[] = [];
+    // Standard 18 hole set
     for (let i = 1; i <= 18; i++) {
       holes.push({
         number: i,
-        par: 4,
+        par: 4, 
         tee: tees[i.toString()] || { lat: 0, lng: 0 },
         green: greens[i.toString()] || { lat: 0, lng: 0 }
       });
