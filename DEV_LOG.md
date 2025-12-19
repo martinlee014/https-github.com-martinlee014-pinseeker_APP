@@ -1,18 +1,18 @@
 # PinSeeker Web - Development Log
 
-## Version: V7.17.0 (Course Creation Entry)
+## Version: V7.18.0 (Visual Polish - 3D Trajectories)
 **Date:** 2024-06-05
 **Branch:** `main`
 **Status:** ✅ ARCHIVED
 
 ### Features & Fixes
-- **Course Manager UI Enhancement**:
-  - Added a prominent "Create New Course" action card at the top of the Course Database.
-  - This provides a clearer manual entry point for users to start mapping courses from scratch.
-- **Workflow Optimization**: 
-  - Refined the transition from the manager to the editor to ensure a smooth "Manual" setup flow.
+- **Trajectory Shadowing**: 
+  - Implemented multi-layered Polyline rendering for shot arcs.
+  - Added a "ground shadow" effect using a semi-transparent black offset layer beneath the flight path.
+  - Improved stroke weight and opacity balance for better visibility against high-contrast satellite imagery.
+- **Review Mode Enhancement**: Specifically optimized the arc visibility for the hole-by-hole replay analysis.
 
-## Version: V7.16.1 (Documentation Sync)
+## Version: V7.17.0 (Course Creation Entry)
 **Date:** 2024-06-05
 **Branch:** `main`
 **Status:** ✅ ARCHIVED
