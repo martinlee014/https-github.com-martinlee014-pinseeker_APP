@@ -1,30 +1,18 @@
 # PinSeeker Web - Development Log
 
+## Version: V7.17.0 (Course Creation Entry)
+**Date:** 2024-06-05
+**Branch:** `main`
+**Status:** ✅ ARCHIVED
+
+### Features & Fixes
+- **Course Manager UI Enhancement**:
+  - Added a prominent "Create New Course" action card at the top of the Course Database.
+  - This provides a clearer manual entry point for users to start mapping courses from scratch.
+- **Workflow Optimization**: 
+  - Refined the transition from the manager to the editor to ensure a smooth "Manual" setup flow.
+
 ## Version: V7.16.1 (Documentation Sync)
-**Date:** 2024-06-05
-**Branch:** `main`
-**Status:** ✅ ARCHIVED
-
-### Features & Fixes
-- **User Manual Update**: Added comprehensive guide for the new HDCP-driven auto-configuration feature.
-- **Consistency Audit**: Verified that HDCP editing, modal triggers, and storage persistence are fully synchronized across Dashboard and Settings.
-
-## Version: V7.16.0 (HDCP-Driven Strategy)
-**Date:** 2024-06-05
-**Branch:** `main`
-**Status:** ✅ ARCHIVED
-
-### Features & Fixes
-- **HDCP Club Auto-Config**:
-  - Users can now edit their HDCP from the Dashboard.
-  - Added a smart generator that creates a full 14-club bag with realistic Carry, Side Error, and Depth Error based on skill level.
-  - Higher HDCP results in shorter distances and wider dispersion ellipses.
-- **Persistence**: HDCP is now saved to local storage.
-- **UI/UX**: 
-  - Added HDCP input modal.
-  - Added club synchronization confirmation dialog.
-
-## Version: V7.15.0 (Stable Milestone - Refactored)
 **Date:** 2024-06-05
 **Branch:** `main`
 **Status:** ✅ ARCHIVED
