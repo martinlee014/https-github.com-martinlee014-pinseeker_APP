@@ -4,7 +4,7 @@ import { AppContext } from '../App';
 import { StorageService } from '../services/storage';
 import { RoundHistory, GolfCourse } from '../types';
 import * as MathUtils from '../services/mathUtils';
-import { Plus, ChevronRight, Trophy, Calendar, MapPin, Play, RefreshCw, X, Edit2, Globe, Search } from 'lucide-react';
+import { Plus, ChevronRight, Trophy, Calendar, MapPin, Play, RefreshCw, X, Edit2 } from 'lucide-react';
 import { ModalOverlay, HdcpInputModal, ConfirmClubSyncModal } from '../components/Modals';
 
 const Dashboard = () => {
@@ -111,7 +111,7 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="p-4 space-y-6 pb-24">
+    <div className="p-4 space-y-6">
       <div className="flex justify-between items-end">
         <div>
           <h2 className="text-gray-400 text-sm font-medium">WELCOME BACK</h2>
@@ -126,36 +126,18 @@ const Dashboard = () => {
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <button
-          onClick={handleStartClick}
-          className="col-span-2 bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 text-white p-6 rounded-2xl shadow-lg shadow-green-900/20 flex items-center justify-between group transition-all"
-        >
-          <div className="flex flex-col items-start">
-            <span className="font-bold text-xl uppercase tracking-tighter">Play Local</span>
-            <span className="text-green-100 text-[10px] opacity-80 font-black uppercase tracking-widest">Tee Off Now</span>
-          </div>
-          <div className="bg-white/20 p-2 rounded-full group-hover:bg-white/30 transition-colors">
-            <Play size={24} fill="white" />
-          </div>
-        </button>
-
-        <button
-          onClick={() => navigate('/discovery')}
-          className="bg-gray-900 border border-blue-500/30 p-4 rounded-2xl flex flex-col items-center justify-center gap-2 hover:bg-gray-800 transition-all text-blue-400"
-        >
-          <Globe size={28} />
-          <span className="text-[10px] font-black uppercase tracking-widest">Discovery</span>
-        </button>
-
-        <button
-          onClick={() => navigate('/settings/courses/edit')}
-          className="bg-gray-900 border border-gray-700 p-4 rounded-2xl flex flex-col items-center justify-center gap-2 hover:bg-gray-800 transition-all text-gray-400"
-        >
-          <Search size={28} />
-          <span className="text-[10px] font-black uppercase tracking-widest">Map Builder</span>
-        </button>
-      </div>
+      <button
+        onClick={handleStartClick}
+        className="w-full bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 text-white p-6 rounded-2xl shadow-lg shadow-green-900/20 flex items-center justify-between group transition-all"
+      >
+        <div className="flex flex-col items-start">
+          <span className="font-bold text-xl">START NEW ROUND</span>
+          <span className="text-green-100 text-sm opacity-80">Select Course & Tee Off</span>
+        </div>
+        <div className="bg-white/20 p-2 rounded-full group-hover:bg-white/30 transition-colors">
+          <Plus size={24} />
+        </div>
+      </button>
 
       <div>
         <h3 className="text-gray-500 font-bold text-sm tracking-wider mb-3">RECENT ROUNDS</h3>
@@ -245,10 +227,10 @@ const Dashboard = () => {
                     </button>
                 ))}
                 <button
-                    onClick={() => navigate('/discovery')}
-                    className="w-full bg-blue-900/10 hover:bg-blue-900/20 border border-dashed border-blue-500/50 p-4 rounded-xl flex items-center justify-center gap-2 text-blue-400 hover:text-blue-300 transition-all mt-4"
+                    onClick={() => navigate('/settings/courses/edit')}
+                    className="w-full bg-gray-900/50 hover:bg-gray-800 border border-dashed border-gray-700 p-4 rounded-xl flex items-center justify-center gap-2 text-gray-400 hover:text-white transition-all mt-4"
                 >
-                    <Globe size={16} /> Discovery More Worldwide
+                    <Plus size={16} /> Add New Course
                 </button>
             </div>
         </ModalOverlay>

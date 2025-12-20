@@ -38,14 +38,35 @@ PinSeeker is not just a GPS rangefinder. It is a precision tool built for golfer
 
 **Crucial**: To use the GPS Location features (`navigator.geolocation`) on a mobile device (iOS/Android), this application **must be served over HTTPS**.
 
-## 🌐 Deployment & Anonymity Guide
+## 🌐 Deployment & Sync to GitHub
 
-To share this app with friends **without exposing your GitHub username**, use Vercel.
+To update your remote GitHub repository with the latest changes from this project, run the following commands in your terminal:
 
-1.  Push to GitHub.
-2.  Import project to [Vercel](https://vercel.com).
-3.  Deploy.
-4.  (Optional) Rename the Vercel project domain to something generic.
+```bash
+# 1. Initialize git if you haven't already
+git init
+
+# 2. Add all files to the staging area
+git add .
+
+# 3. Commit the changes (Version 7.17.0)
+git commit -m "chore: bump version to 7.17.0 and stabilize runtime"
+
+# 4. Ensure you are on the main branch
+git branch -M main
+
+# 5. Add your remote repository (replace with your actual URL)
+# git remote add origin https://github.com/YOUR_USERNAME/pinseeker-web.git
+
+# 6. Push changes to GitHub
+git push -u origin main
+```
+
+To deploy the live app to GitHub Pages:
+
+```bash
+npm run deploy
+```
 
 ## 🛠 Local Development
 

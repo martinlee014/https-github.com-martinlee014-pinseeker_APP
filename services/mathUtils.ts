@@ -104,12 +104,12 @@ export const getEllipsePoints = (center: LatLng, width: number, height: number, 
 
 export const getArcPoints = (start: LatLng, end: LatLng): LatLng[] => {
   const points: LatLng[] = [];
-  const numPoints = 50; // Increased for maximum smoothness
+  const numPoints = 20;
   const midLat = (start.lat + end.lat) / 2;
   const midLng = (start.lng + end.lng) / 2;
   const bearing = calculateBearing(start, end);
   const dist = calculateDistance(start, end);
-  const offsetMeters = dist * 0.12; // Slightly higher peak for better "review" visuals
+  const offsetMeters = dist * 0.1; 
   const controlPoint = calculateDestination({lat: midLat, lng: midLng}, offsetMeters, bearing - 90);
 
   for (let i = 0; i <= numPoints; i++) {

@@ -767,62 +767,30 @@ const PlayRound = () => {
                       <Polyline positions={drawingPoints.map(p => [p.lat, p.lng])} pathOptions={{ color: '#facc15', weight: 2, dashArray: '2,4', interactive: false }} />
                   </>
               )}
-              {holeShots.map((s, i) => {
-                  const arcPoints = MathUtils.getArcPoints(s.from, s.to);
-                  return (
-                      <Fragment key={i}>
-                          {isReplay && s.plannedInfo && (
-                            <>
-                              <Polygon 
-                                positions={MathUtils.getEllipsePoints(
-                                    s.plannedInfo.target, 
-                                    s.plannedInfo.dispersion.width, 
-                                    s.plannedInfo.dispersion.depth, 
-                                    s.plannedInfo.dispersion.rotation
-                                ).map(p => [p.lat, p.lng] as [number, number])} 
-                                pathOptions={{ color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.1, weight: 1, dashArray: '2, 4', interactive: false, className: 'pointer-events-none' }} 
-                              />
-                              <Polyline 
-                                positions={[[s.from.lat, s.from.lng], [s.plannedInfo.target.lat, s.plannedInfo.target.lng]]} 
-                                pathOptions={{ color: "#3b82f6", weight: 1, dashArray: "5, 5", opacity: 0.3, interactive: false, className: 'pointer-events-none' }} 
-                              />
-                            </>
-                          )}
-                          <Marker position={[s.from.lat, s.from.lng]} icon={s.shotNumber === 1 ? startMarkerIcon : ballIcon} />
-                          
-                          {/* Ground Track Shadow (Solid Light Gray Line) */}
-                          <Polyline 
-                            positions={[[s.from.lat, s.from.lng], [s.to.lat, s.to.lng]]} 
-                            pathOptions={{ 
-                                color: "#9ca3af", 
-                                weight: 2, 
-                                opacity: 0.4, 
-                                interactive: false, 
-                                className: 'pointer-events-none' 
-                            }} 
+              {holeShots.map((s, i) => (
+                  <Fragment key={i}>
+                      {isReplay && s.plannedInfo && (
+                        <>
+                          <Polygon 
+                            positions={MathUtils.getEllipsePoints(
+                                s.plannedInfo.target, 
+                                s.plannedInfo.dispersion.width, 
+                                s.plannedInfo.dispersion.depth, 
+                                s.plannedInfo.dispersion.rotation
+                            ).map(p => [p.lat, p.lng] as [number, number])} 
+                            pathOptions={{ color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.1, weight: 1, dashArray: '2, 4', interactive: false, className: 'pointer-events-none' }} 
                           />
-
-                          {/* Flight Trajectory (Pro Neon Glow Style) */}
-                          {/* 1. Outer Halo */}
                           <Polyline 
-                            positions={arcPoints.map(p => [p.lat, p.lng])} 
-                            pathOptions={{ color: "#fef08a", weight: 7, opacity: 0.15, interactive: false, className: 'pointer-events-none' }} 
+                            positions={[[s.from.lat, s.from.lng], [s.plannedInfo.target.lat, s.plannedInfo.target.lng]]} 
+                            pathOptions={{ color: "#3b82f6", weight: 1, dashArray: "5, 5", opacity: 0.3, interactive: false, className: 'pointer-events-none' }} 
                           />
-                          {/* 2. Main Neon Path */}
-                          <Polyline 
-                            positions={arcPoints.map(p => [p.lat, p.lng])} 
-                            pathOptions={{ color: "#facc15", weight: 3.5, opacity: 0.8, interactive: false, className: 'pointer-events-none' }} 
-                          />
-                          {/* 3. Core White Light */}
-                          <Polyline 
-                            positions={arcPoints.map(p => [p.lat, p.lng])} 
-                            pathOptions={{ color: "white", weight: 1.2, opacity: 1, interactive: false, className: 'pointer-events-none' }} 
-                          />
-
-                          {isReplay ? <Marker position={[s.to.lat, s.to.lng]} icon={createReplayLabelIcon(`${s.clubUsed} - ${MathUtils.formatDistance(s.distance, useYards)}`, -mapRotation)} /> : <Marker position={[s.to.lat, s.to.lng]} icon={targetIcon} eventHandlers={{ contextmenu: (e) => { e.originalEvent.preventDefault(); setShotToDelete(s); } }} />}
-                      </Fragment>
-                  );
-              })}
+                        </>
+                      )}
+                      <Marker position={[s.from.lat, s.from.lng]} icon={s.shotNumber === 1 ? startMarkerIcon : ballIcon} />
+                      <Polyline positions={MathUtils.getArcPoints(s.from, s.to).map(p => [p.lat, p.lng])} pathOptions={{ color: "white", weight: 2, opacity: 0.8, interactive: false }} />
+                      {isReplay ? <Marker position={[s.to.lat, s.to.lng]} icon={createReplayLabelIcon(`${s.clubUsed} - ${MathUtils.formatDistance(s.distance, useYards)}`, -mapRotation)} /> : <Marker position={[s.to.lat, s.to.lng]} icon={targetIcon} eventHandlers={{ contextmenu: (e) => { e.originalEvent.preventDefault(); setShotToDelete(s); } }} />}
+                  </Fragment>
+              ))}
               {!isReplay && !isMeasureMode && !isNoteMode && (
                   <>
                       <Marker position={[currentBallPos.lat, currentBallPos.lng]} icon={shotNum === 1 ? startMarkerIcon : ballIcon} />
