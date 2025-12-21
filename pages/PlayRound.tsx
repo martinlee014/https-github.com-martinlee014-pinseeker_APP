@@ -10,7 +10,7 @@ import * as MathUtils from '../services/mathUtils';
 import { ClubStats, HoleScore, ShotRecord, RoundHistory, LatLng, GolfCourse, MapAnnotation } from '../types';
 import ClubSelector from '../components/ClubSelector';
 import { ScoreModal, ShotConfirmModal, HoleSelectorModal, FullScorecardModal, ModalOverlay } from '../components/Modals';
-import { Flag, Wind, ChevronLeft, Grid, ListChecks, ArrowLeft, ArrowRight, ChevronDown, MapPin, Ruler, Trash2, PenTool, Type, Highlighter, X, Check, Eraser, Home, Signal, SignalHigh, SignalLow, SignalMedium, Footprints, PlayCircle } from 'lucide-react';
+import { Flag, Wind, ChevronLeft, Grid, ListChecks, ArrowLeft, ArrowRight, ChevronDown, MapPin, Ruler, Trash2, PenTool, Type, Highlighter, X, Check, Eraser, Home, Signal, SignalHigh, SignalLow, SignalMedium, Footprints, PlayCircle, RotateCcw } from 'lucide-react';
 
 // --- Icons Setup ---
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -307,7 +307,8 @@ const RotatedMapHandler = ({
       startClientPos.current = pos;
 
       const target = e.target as HTMLElement;
-      const isBlocked = target.closest('.leaflet-marker-draggable') || target.closest('.leaflet-popup-pane');
+      // Prevent custom map handling if interacting with markers, popups, or any interactive Leaflet layer
+      const isBlocked = target.closest('.leaflet-interactive') || target.closest('.leaflet-popup-pane');
       
       if (!isBlocked) {
           longPressTimer.current = setTimeout(() => {
@@ -360,7 +361,7 @@ const RotatedMapHandler = ({
       }
       if (startClientPos.current && !hasMovedSignificantly.current) {
          const target = e.target as HTMLElement;
-         const isMarker = target.closest('.leaflet-marker-icon');
+         const isMarker = target.closest('.leaflet-interactive');
          if (!isMarker) {
              const latlng = calculateLatLng(startClientPos.current);
              onClick({ lat: latlng.lat, lng: latlng.lng });
@@ -609,6 +610,36 @@ const PlayRound = () => {
     return (sorted.find(c => c.carry >= distLandingToGreen) || sorted[sorted.length-1]).name;
   }, [distLandingToGreen, bag, currentLayupStrategy, distToGreen, shotNum]);
 
+  const saveDrawing = () => {
+      if (drawingPoints.length < 2) return;
+      const newNote: MapAnnotation = {
+          id: crypto.randomUUID(),
+          courseId: activeCourse.id,
+          holeNumber: hole.number,
+          type: 'path',
+          points: drawingPoints
+      };
+      StorageService.saveAnnotation(newNote);
+      setAnnotations(prev => [...prev, newNote]);
+      setDrawingPoints([]);
+  };
+
+  const saveTextNote = () => {
+      if (!showTextInput || !textInputValue.trim()) { setShowTextInput(null); return; }
+      const newNote: MapAnnotation = {
+          id: crypto.randomUUID(),
+          courseId: activeCourse.id,
+          holeNumber: hole.number,
+          type: 'text',
+          points: [showTextInput],
+          text: textInputValue
+      };
+      StorageService.saveAnnotation(newNote);
+      setAnnotations(prev => [...prev, newNote]);
+      setShowTextInput(null);
+      setTextInputValue("");
+  };
+
   const handleMapClick = (latlng: any) => {
     if (isReplay) return;
     if (isNoteMode) {
@@ -616,7 +647,12 @@ const PlayRound = () => {
             const newNote: MapAnnotation = { id: crypto.randomUUID(), courseId: activeCourse.id, holeNumber: hole.number, type: 'icon', subType: 'flag', points: [{lat: latlng.lat, lng: latlng.lng}] };
             StorageService.saveAnnotation(newNote);
             setAnnotations(prev => [...prev, newNote]);
-        } else if (activeTool === 'draw') setDrawingPoints(prev => [...prev, {lat: latlng.lat, lng: latlng.lng}]);
+        } else if (activeTool === 'draw') {
+             setDrawingPoints(prev => [...prev, {lat: latlng.lat, lng: latlng.lng}]);
+        } else if (activeTool === 'text') {
+             setShowTextInput({lat: latlng.lat, lng: latlng.lng}); 
+             setTextInputValue("");
+        }
         return;
     }
     if (isMeasureMode) {
@@ -683,8 +719,6 @@ const PlayRound = () => {
          isGPS: true,
          dist: MathUtils.calculateDistance(trackingStartPos!, liveLocation)
     });
-    // Don't close tracking here; pendingShot modal does the logic.
-    // Tracking will be closed in confirmShot
   };
 
   const confirmShot = () => {
@@ -779,7 +813,7 @@ const PlayRound = () => {
               <Marker position={[hole.green.lat, hole.green.lng]} icon={flagIcon} />
               {annotations.map(note => {
                  const handlers = isNoteMode ? { click: () => activeTool === 'eraser' && deleteAnnotation(note.id) } : {};
-                 if (note.type === 'path') return <Polyline key={note.id} positions={note.points.map(p => [p.lat, p.lng])} pathOptions={{ color: '#facc15', weight: 3, dashArray: '5,5', opacity: 0.8, interactive: false }} eventHandlers={handlers} />;
+                 if (note.type === 'path') return <Polyline key={note.id} positions={note.points.map(p => [p.lat, p.lng])} pathOptions={{ color: '#facc15', weight: 3, dashArray: '5,5', opacity: 0.8, interactive: true }} eventHandlers={handlers} />;
                  if (note.type === 'text') return <Marker key={note.id} position={[note.points[0].lat, note.points[0].lng]} icon={createAnnotationTextIcon(note.text || "", -mapRotation)} eventHandlers={handlers} />;
                  if (note.type === 'icon') return <Marker key={note.id} position={[note.points[0].lat, note.points[0].lng]} icon={userFlagIcon} eventHandlers={handlers} />;
                  return null;
@@ -902,6 +936,36 @@ const PlayRound = () => {
         </div>
       )}
 
+      {!isReplay && isNoteMode && (
+          <div className="absolute bottom-0 w-full z-30 pt-2 px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] bg-black/80 backdrop-blur-md border-t border-white/10">
+              <div className="flex justify-between items-center mb-2">
+                 <button onClick={() => setActiveTool('text')} className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-colors ${activeTool === 'text' ? 'bg-yellow-600 text-white' : 'text-gray-400'}`}>
+                    <Type size={20} /> <span className="text-[10px] font-bold">Text</span>
+                 </button>
+                 <button onClick={() => setActiveTool('pin')} className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-colors ${activeTool === 'pin' ? 'bg-yellow-600 text-white' : 'text-gray-400'}`}>
+                    <MapPin size={20} /> <span className="text-[10px] font-bold">Pin</span>
+                 </button>
+                 <button onClick={() => setActiveTool('draw')} className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-colors ${activeTool === 'draw' ? 'bg-yellow-600 text-white' : 'text-gray-400'}`}>
+                    <Highlighter size={20} /> <span className="text-[10px] font-bold">Draw</span>
+                 </button>
+                 <button onClick={() => setActiveTool('eraser')} className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-colors ${activeTool === 'eraser' ? 'bg-red-600 text-white' : 'text-gray-400'}`}>
+                    <Eraser size={20} /> <span className="text-[10px] font-bold">Eraser</span>
+                 </button>
+              </div>
+              
+              {activeTool === 'draw' && drawingPoints.length > 0 && (
+                  <div className="flex gap-2 mt-2">
+                      <button onClick={() => setDrawingPoints([])} className="flex-1 bg-gray-700 py-2 rounded-lg text-white font-bold text-xs flex items-center justify-center gap-2"><Trash2 size={12}/> Clear</button>
+                      <button onClick={saveDrawing} className="flex-1 bg-green-600 py-2 rounded-lg text-white font-bold text-xs flex items-center justify-center gap-2"><Check size={12}/> Save Line</button>
+                  </div>
+              )}
+              
+              <div className="text-center text-[10px] text-gray-500 mt-2 pb-2">
+                  {activeTool === 'eraser' ? 'Tap an annotation to delete it' : activeTool === 'draw' ? 'Tap map to place points' : 'Tap map to place'}
+              </div>
+          </div>
+      )}
+
       {!isReplay && !isNoteMode && (
         <div className="absolute bottom-0 w-full z-30 pt-2 px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] bg-gradient-to-t from-black/95 via-black/80 to-transparent">
             {isTrackingMode ? (
@@ -953,6 +1017,29 @@ const PlayRound = () => {
       {showScoreModal && <ScoreModal par={hole.par} holeNum={hole.number} recordedShots={Math.max(0, shotNum - 1)} onSave={saveHoleScore} onClose={() => setShowScoreModal(false)} />}
       {showFullCard && <FullScorecardModal holes={activeCourse.holes} scorecard={scorecard} onFinishRound={finishRound} onClose={() => setShowFullCard(false)} />}
       {pendingShot && <ShotConfirmModal dist={MathUtils.formatDistance(pendingShot.dist, useYards)} club={selectedClub} clubs={bag} isGPS={pendingShot.isGPS} isLongDistWarning={pendingShot.dist > 500} onChangeClub={setSelectedClub} onConfirm={confirmShot} onCancel={() => setPendingShot(null)} />}
+      
+      {showTextInput && (
+        <ModalOverlay onClose={() => setShowTextInput(null)}>
+            <div className="p-4 bg-gray-900 border-b border-gray-800">
+                <h3 className="text-lg font-bold text-white">Add Note</h3>
+            </div>
+            <div className="p-4">
+                <input 
+                    autoFocus
+                    type="text" 
+                    className="w-full bg-gray-800 border border-gray-700 rounded-xl p-4 text-white mb-4 outline-none focus:border-yellow-500"
+                    placeholder="Enter text..."
+                    value={textInputValue}
+                    onChange={(e) => setTextInputValue(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && saveTextNote()}
+                />
+                <div className="flex gap-3">
+                    <button onClick={() => setShowTextInput(null)} className="flex-1 bg-gray-800 text-gray-300 py-3 rounded-xl font-bold">Cancel</button>
+                    <button onClick={saveTextNote} className="flex-1 bg-yellow-600 text-white py-3 rounded-xl font-bold">Save</button>
+                </div>
+            </div>
+        </ModalOverlay>
+      )}
     </div>
   );
 };

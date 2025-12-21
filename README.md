@@ -49,8 +49,8 @@ git init
 # 2. Add all files to the staging area
 git add .
 
-# 3. Commit the changes (Version 7.17.0)
-git commit -m "chore: bump version to 7.17.0 and stabilize runtime"
+# 3. Commit the changes (Version 7.17.1)
+git commit -m "fix: restore annotation toolbar and map interaction v7.17.1"
 
 # 4. Ensure you are on the main branch
 git branch -M main
