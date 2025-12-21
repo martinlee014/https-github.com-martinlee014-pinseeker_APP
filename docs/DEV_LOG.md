@@ -1,10 +1,20 @@
 
 # PinSeeker Web - Development Log
 
-## Version: V7.18.0 (Advanced Stats & GPS Tee)
+## Version: V7.18.1 (UI Polish)
 **Date:** 2024-06-06
 **Branch:** `main`
 **Status:** ✅ CURRENT
+
+### Features & Fixes
+- **UI Refinement**: Replaced "Tee Off" emojis (🚀/🛰️) with professional Lucide icons (`Rocket`/`Satellite`) to maintain visual consistency with the app's dark/professional theme.
+- **Style Unification**: Updated the Tee Off button gradient to match the standard blue action buttons (`from-blue-600 to-blue-700`), removing conflicting colors.
+- **Interaction Feedback**: Polished the long-press progress bar animation for the "From GPS" action.
+
+## Version: V7.18.0 (Advanced Stats & GPS Tee)
+**Date:** 2024-06-06
+**Branch:** `main`
+**Status:** ✅ ARCHIVED
 
 ### Features & Fixes
 - **GPS Tee-Off**: Added long-press (3s) functionality to the "TEE OFF" button. Users can now reset the hole starting point to their current GPS location (e.g., if playing from a different tee box or a specific practice spot).

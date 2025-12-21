@@ -49,8 +49,8 @@ git init
 # 2. Add all files to the staging area
 git add .
 
-# 3. Commit the changes (Version 7.18.0)
-git commit -m "feat: upgrade round analysis stats and add gps tee feature v7.18.0"
+# 3. Commit the changes (Version 7.18.1)
+git commit -m "style: refine tee off button ui with lucide icons v7.18.1"
 
 # 4. Ensure you are on the main branch
 git branch -M main

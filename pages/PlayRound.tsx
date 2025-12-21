@@ -10,7 +10,7 @@ import * as MathUtils from '../services/mathUtils';
 import { ClubStats, HoleScore, ShotRecord, RoundHistory, LatLng, GolfCourse, MapAnnotation } from '../types';
 import ClubSelector from '../components/ClubSelector';
 import { ScoreModal, ShotConfirmModal, HoleSelectorModal, FullScorecardModal, ModalOverlay } from '../components/Modals';
-import { Flag, Wind, ChevronLeft, Grid, ListChecks, ArrowLeft, ArrowRight, ChevronDown, MapPin, Ruler, Trash2, PenTool, Type, Highlighter, X, Check, Eraser, Home, Signal, SignalHigh, SignalLow, SignalMedium, Footprints, PlayCircle, RotateCcw } from 'lucide-react';
+import { Flag, Wind, ChevronLeft, Grid, ListChecks, ArrowLeft, ArrowRight, ChevronDown, MapPin, Ruler, Trash2, PenTool, Type, Highlighter, X, Check, Eraser, Home, Signal, SignalHigh, SignalLow, SignalMedium, Footprints, PlayCircle, RotateCcw, Rocket, Satellite } from 'lucide-react';
 
 // --- Icons Setup ---
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -227,7 +227,7 @@ const GolfBagIcon = ({ size = 24, className = "" }: { size?: number, className?:
     strokeLinejoin="round" 
     className={className}
   >
-    <path d="M7 6h10v14a2 2 0 0 1-2 2H9a2 2 0 0 1-2 2H9a2 2 0 0 1-2 2H9a2 2 0 0 1-2 2H9a2 2 0 0 1-2 2H9a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V6z" />
+    <path d="M7 6h10v14a2 2 0 0 1-2 2H9a2 2 0 0 1-2 2H9a2 2 0 0 1-2 2H9a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V6z" />
     <path d="M9 6V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3" />
     <path d="M9 4l-2 2" />
     <path d="M15 4l2 2" />
@@ -1077,10 +1077,20 @@ const PlayRound = () => {
                                 onPointerDown={handleTeeDown}
                                 onPointerUp={handleTeeUp}
                                 onPointerLeave={handleTeeUp}
-                                className={`w-20 bg-gradient-to-b from-blue-500 to-blue-600 text-white rounded-2xl flex flex-col items-center justify-center shadow-lg shadow-blue-900/50 transition-all border border-blue-400/20 select-none ${isTeePressing ? 'scale-90 bg-blue-700 ring-2 ring-blue-400 ring-opacity-50' : 'active:scale-95'}`}
+                                className={`w-20 relative overflow-hidden transition-all duration-200 rounded-2xl border flex flex-col items-center justify-center shadow-lg ${isTeePressing ? 'bg-blue-800 border-blue-600 scale-95' : 'bg-gradient-to-br from-blue-600 to-blue-700 border-blue-500 hover:brightness-110'}`}
                            >
-                                <div className="text-[20px]">{teeButtonText === "TEE OFF" ? "🚀" : "🛰️"}</div>
-                                <span className="text-[9px] font-black uppercase tracking-wide mt-0.5 whitespace-nowrap">{teeButtonText}</span>
+                                {teeButtonText === "TEE OFF" ? (
+                                   <Rocket className="text-white mb-1" size={24} strokeWidth={1.5} />
+                                ) : (
+                                   <Satellite className="text-white mb-1 animate-pulse" size={24} strokeWidth={1.5} />
+                                )}
+                                <span className="text-white font-bold text-[9px] uppercase tracking-wider">{teeButtonText}</span>
+                                
+                                {isTeePressing && (
+                                    <div className="absolute bottom-0 left-0 h-1 bg-white/30 w-full">
+                                        <div className="h-full bg-white animate-[width_3s_linear_forwards] w-0"></div>
+                                    </div>
+                                )}
                            </button>
                        ) : (
                           <div className="flex flex-col gap-1.5 h-full">
