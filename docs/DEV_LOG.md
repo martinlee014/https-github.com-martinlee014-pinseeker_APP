@@ -1,10 +1,22 @@
 
 # PinSeeker Web - Development Log
 
-## Version: V7.18.1 (UI Polish)
+## Version: V7.18.2 (HUD Redesign & Visual Optimization)
 **Date:** 2024-06-06
 **Branch:** `main`
 **Status:** ✅ CURRENT
+
+### Features & Fixes
+- **HUD Redesign**: Completely refactored the Top-Left Distance display in `PlayRound`.
+  - **Vertical Stack**: Layout changed to logical depth order (Back -> Pin -> Front).
+  - **Minimalist UI**: Removed redundant text labels ("Front", "Back", "To Pin") to reduce clutter.
+  - **Typography**: Significantly increased font sizes. Pin distance is now ultra-prominent (5XL), with legibly large edge distances (LG).
+- **Visual Balance**: Adjusted the transparency and compact nature of the HUD card to balance against the right-side tool menu.
+
+## Version: V7.18.1 (UI Polish)
+**Date:** 2024-06-06
+**Branch:** `main`
+**Status:** ✅ ARCHIVED
 
 ### Features & Fixes
 - **UI Refinement**: Replaced "Tee Off" emojis (🚀/🛰️) with professional Lucide icons (`Rocket`/`Satellite`) to maintain visual consistency with the app's dark/professional theme.

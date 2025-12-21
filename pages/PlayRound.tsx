@@ -10,7 +10,7 @@ import * as MathUtils from '../services/mathUtils';
 import { ClubStats, HoleScore, ShotRecord, RoundHistory, LatLng, GolfCourse, MapAnnotation } from '../types';
 import ClubSelector from '../components/ClubSelector';
 import { ScoreModal, ShotConfirmModal, HoleSelectorModal, FullScorecardModal, ModalOverlay } from '../components/Modals';
-import { Flag, Wind, ChevronLeft, Grid, ListChecks, ArrowLeft, ArrowRight, ChevronDown, MapPin, Ruler, Trash2, PenTool, Type, Highlighter, X, Check, Eraser, Home, Signal, SignalHigh, SignalLow, SignalMedium, Footprints, PlayCircle, RotateCcw, Rocket, Satellite } from 'lucide-react';
+import { Flag, Wind, ChevronLeft, Grid, ListChecks, ArrowLeft, ArrowRight, ChevronDown, MapPin, Ruler, Trash2, PenTool, Type, Highlighter, X, Check, Eraser, Home, Signal, SignalHigh, SignalLow, SignalMedium, Footprints, PlayCircle, RotateCcw, Rocket, Satellite, Menu, MoreVertical, LayoutGrid } from 'lucide-react';
 
 // --- Icons Setup ---
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -227,7 +227,7 @@ const GolfBagIcon = ({ size = 24, className = "" }: { size?: number, className?:
     strokeLinejoin="round" 
     className={className}
   >
-    <path d="M7 6h10v14a2 2 0 0 1-2 2H9a2 2 0 0 1-2 2H9a2 2 0 0 1-2 2H9a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V6z" />
+    <path d="M7 6h10v14a2 2 0 0 1-2 2H9a2 2 0 0 1-2 2H9a2 2 0 0 1-2 2H9a2 2 0 0 1-2 2H9a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V6z" />
     <path d="M9 6V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3" />
     <path d="M9 4l-2 2" />
     <path d="M15 4l2 2" />
@@ -471,6 +471,9 @@ const PlayRound = () => {
   const [gpsSignalLevel, setGpsSignalLevel] = useState<0 | 1 | 2 | 3>(0);
   const watchIdRef = useRef<number | null>(null);
   
+  // Menu State for collapsing icons
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
   // New Tracking State
   const [isTrackingMode, setIsTrackingMode] = useState(false);
   const [trackingStartPos, setTrackingStartPos] = useState<LatLng | null>(null);
@@ -863,6 +866,10 @@ const PlayRound = () => {
     }
   };
 
+  const toggleMenu = () => {
+      setIsMenuOpen(!isMenuOpen);
+  };
+
   return (
     <div className="h-full relative bg-gray-900 flex flex-col overflow-hidden select-none touch-none" onContextMenu={(e) => e.preventDefault()}>
       <div className="absolute inset-0 z-0 bg-black w-full h-full overflow-hidden">
@@ -892,6 +899,9 @@ const PlayRound = () => {
               )}
               {holeShots.map((s, i) => {
                   const arcPoints = MathUtils.getArcPoints(s.from, s.to).map(p => [p.lat, p.lng]);
+                  const midLat = (s.from.lat + s.to.lat) / 2;
+                  const midLng = (s.from.lng + s.to.lng) / 2;
+
                   return (
                       <Fragment key={i}>
                           {isReplay && s.plannedInfo && (
@@ -914,6 +924,7 @@ const PlayRound = () => {
                             </>
                           )}
                           <Marker position={[s.from.lat, s.from.lng]} icon={s.shotNumber === 1 ? startMarkerIcon : ballIcon} />
+                          <Marker position={[s.to.lat, s.to.lng]} icon={ballIcon} />
                           <Polyline 
                               positions={[[s.from.lat, s.from.lng], [s.to.lat, s.to.lng]]} 
                               pathOptions={{ color: '#cbd5e1', weight: 4, opacity: 0.25, className: 'pointer-events-none' }} 
@@ -929,8 +940,7 @@ const PlayRound = () => {
                               pathOptions={{ color: '#ffff00', weight: 3, opacity: 1, lineCap: 'round' }} 
                               interactive={false}
                           />
-
-                          {isReplay ? <Marker position={[s.to.lat, s.to.lng]} icon={createReplayLabelIcon(`${s.clubUsed} - ${MathUtils.formatDistance(s.distance, useYards)}`, -mapRotation)} /> : <Marker position={[s.to.lat, s.to.lng]} icon={targetIcon} eventHandlers={{ contextmenu: (e) => { e.originalEvent.preventDefault(); setShotToDelete(s); } }} />}
+                          {isReplay ? <Marker position={[midLat, midLng]} icon={createReplayLabelIcon(`${s.clubUsed} - ${MathUtils.formatDistance(s.distance, useYards)}`, -mapRotation)} /> : <Marker position={[s.to.lat, s.to.lng]} icon={targetIcon} eventHandlers={{ contextmenu: (e) => { e.originalEvent.preventDefault(); setShotToDelete(s); } }} />}
                       </Fragment>
                   )
               })}
@@ -965,35 +975,196 @@ const PlayRound = () => {
             </MapContainer>
         </div>
       </div>
-      <div className="absolute top-0 left-0 right-0 z-[1000] p-3 pointer-events-none flex justify-between items-start">
-        <div className="pointer-events-auto flex flex-col gap-2">
-           <button onClick={() => navigate(-1)} className="bg-black/50 p-2 rounded-full text-white backdrop-blur-md border border-white/5"><ChevronLeft size={20} /></button>
-           <button onClick={() => navigate('/dashboard')} className="bg-black/50 p-2 rounded-full text-white backdrop-blur-md border border-white/5"><Home size={20} /></button>
-           {!isReplay && <button onClick={() => navigate('/settings/clubs', { state: { fromGame: true } })} className="bg-black/50 p-2 rounded-full text-white backdrop-blur-md border border-white/5 mt-1"><GolfBagIcon size={20} /></button>}
-           <button onClick={() => setShowHoleSelect(true)} className="bg-black/50 p-2 rounded-full text-white backdrop-blur-md border border-white/5 mt-1"><Grid size={20} /></button>
-           {!isReplay && <button onClick={() => setShowFullCard(true)} className="bg-black/50 p-2 rounded-full text-white backdrop-blur-md border border-white/5 mt-1"><ListChecks size={20} /></button>}
-        </div>
-        <div className="text-center mt-1 drop-shadow-lg pointer-events-none">
-          <div className="flex items-center justify-center gap-1.5 mb-1 opacity-80">{isReplay ? <span className="text-[10px] text-gray-400 bg-black/60 px-2 rounded-md font-black tracking-widest">ANALYSIS</span> : <div className="flex items-center gap-1 bg-black/60 px-2 py-0.5 rounded-md backdrop-blur-md">{gpsSignalLevel === 3 ? <Signal size={14} className="text-blue-500" /> : <SignalLow size={14} className="text-red-500" />}<span className="text-[10px] font-mono text-gray-300">{gpsAccuracy ? `±${Math.round(gpsAccuracy)}m` : 'NO GPS'}</span></div>}</div>
-          <h2 className="text-2xl font-black text-white">HOLE {hole.number}</h2>
-          <div className="flex flex-col items-center justify-center gap-1 bg-black/60 rounded-xl px-3 py-1 backdrop-blur-md border border-white/10 shadow-lg">
-              <div className="flex gap-2 text-xs font-bold">
-                  <span className="text-gray-300">PAR {hole.par}</span>
-                  <span className="text-gray-500">|</span>
-                  <span className="text-white">{MathUtils.formatDistance(distToGreen, useYards)}</span>
-              </div>
-              <div className="flex gap-2 text-[10px] font-mono border-t border-white/10 pt-0.5 mt-0.5 w-full justify-center">
-                  <span className="text-blue-300">F:{Math.round(useYards ? distToFront * 1.09361 : distToFront)}</span>
-                  <span className="text-red-300">B:{Math.round(useYards ? distToBack * 1.09361 : distToBack)}</span>
-              </div>
-          </div>
-        </div>
-        <div className="pointer-events-auto flex flex-col gap-2 items-end">
-           {!isReplay && <><button onClick={() => setShowScoreModal(true)} className="bg-green-600/90 p-2.5 rounded-full text-white shadow-lg shadow-green-900/50"><Flag size={20} fill="white"/></button><button onClick={toggleMeasureMode} className={`p-2.5 rounded-full shadow-lg ${isMeasureMode ? 'bg-blue-600 text-white' : 'bg-black/50 text-blue-400'}`}><Ruler size={20} /></button><button onClick={() => setIsNoteMode(!isNoteMode)} className={`p-2.5 rounded-full shadow-lg ${isNoteMode ? 'bg-yellow-600 text-white' : 'bg-black/50 text-yellow-400'}`}><PenTool size={20} /></button><button onClick={() => setShowWind(!showWind)} className="bg-black/50 p-2.5 rounded-full text-gray-400"><Wind size={20} /></button></>}
-        </div>
-      </div>
-      {showWind && <div className="absolute top-20 right-14 z-[1000] bg-black/90 backdrop-blur-xl p-4 rounded-2xl border border-gray-700 w-48 text-gray-300 shadow-2xl flex flex-col gap-4"><div className="flex items-center justify-between border-b border-gray-800 pb-2"><span className="font-bold text-white text-sm flex items-center gap-2"><Wind size={16}/> Wind</span><span className="text-xs bg-blue-900/50 text-blue-300 px-2 py-0.5 rounded">{windSpeed} m/s</span></div><input type="range" min="0" max="20" value={windSpeed} onChange={(e) => setWindSpeed(parseInt(e.target.value))} className="w-full accent-blue-500 h-2 bg-gray-700 rounded-lg appearance-none" /><div className="relative w-32 h-32 mx-auto select-none touch-none" onMouseDown={handleWindCircleInteract} onMouseMove={(e) => e.buttons === 1 && handleWindCircleInteract(e)} onTouchMove={handleWindCircleInteract}><div className="absolute inset-0 rounded-full border-2 border-gray-700 bg-gray-800/50 shadow-inner"></div><div className="absolute inset-0 flex items-center justify-center pointer-events-none transition-transform" style={{ transform: `rotate(${windDir - baseBearing}deg)` }}><div className="relative h-full w-full"><div className="absolute top-2 left-1/2 -translate-x-1/2"><div className="w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-b-[20px] border-b-blue-500"></div><div className="w-1 h-14 bg-blue-500 mx-auto opacity-80"></div></div></div></div><div className="absolute top-1/2 left-1/2 w-4 h-4 bg-gray-200 rounded-full border-2 border-gray-600 -translate-x-1/2 -translate-y-1/2 shadow-lg z-10"></div></div></div>}
       
+      {/* ---------------- UI LAYERS ---------------- */}
+
+      {/* TOP LEFT: MAIN HUD (Compact & Vertical Stack) */}
+      {!isReplay && !isMeasureMode && (
+          <div className="absolute top-4 left-4 z-[900] pointer-events-none animate-in slide-in-from-left-4 duration-300">
+               <div className="pointer-events-auto bg-black/80 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl overflow-hidden min-w-[90px] flex flex-col">
+                   {/* Header Row: Compact */}
+                   <div className="flex items-center justify-between px-2 py-1.5 border-b border-white/10 bg-white/5 gap-2">
+                       <button onClick={() => navigate(-1)} className="text-gray-500 hover:text-white transition-colors">
+                           <ChevronLeft size={14} />
+                       </button>
+                       <div className="flex flex-col items-center leading-none">
+                           <span className="text-[9px] font-black text-white">H{hole.number}</span>
+                           <span className="text-[7px] font-bold text-gray-500">P{hole.par}</span>
+                       </div>
+                       <div className="flex items-center justify-end">
+                           {gpsSignalLevel === 3 ? <SignalHigh size={12} className="text-green-500" /> : gpsSignalLevel === 0 ? <SignalLow size={12} className="text-red-500" /> : <SignalMedium size={12} className="text-yellow-500" />}
+                       </div>
+                   </div>
+
+                   {/* Vertical Distances Stack (Back -> Pin -> Front) */}
+                   <div className="py-2 text-center flex flex-col items-center justify-center gap-0.5">
+                        {/* Back */}
+                        <div className="text-lg font-bold text-gray-400 leading-none">
+                            {Math.round(useYards ? distToBack * 1.09361 : distToBack)}
+                        </div>
+                        
+                        {/* Pin (Big) */}
+                        <div className="text-5xl font-black text-white leading-none tracking-tighter drop-shadow-md my-0.5">
+                            {MathUtils.formatDistance(distToGreen, useYards).replace(/[^0-9]/g, '')}
+                        </div>
+                        
+                        {/* Front */}
+                        <div className="text-lg font-bold text-gray-400 leading-none">
+                            {Math.round(useYards ? distToFront * 1.09361 : distToFront)}
+                        </div>
+                   </div>
+
+                   {/* Plays Like Footer (Conditional) */}
+                   {windSpeed > 0 && (
+                        <div className="border-t border-blue-500/20 bg-blue-900/10 py-1 text-center px-1">
+                            <div className="text-[8px] font-bold text-blue-300 leading-none">
+                                Plays {MathUtils.formatDistance(distToGreen + (distLandingToGreen - selectedClub.carry), useYards)}
+                            </div>
+                        </div>
+                   )}
+               </div>
+          </div>
+      )}
+
+      {/* TOP RIGHT: TOOLS & MENU */}
+      <div className="absolute top-0 right-0 p-4 z-[1000] pointer-events-none flex flex-col gap-3 items-end">
+          <div className="pointer-events-auto flex flex-col gap-3 items-end">
+             {/* FINISH HOLE (Flag) - Topmost Priority */}
+             {!isReplay && !isMeasureMode && !isTrackingMode && (
+                 <button 
+                    onClick={() => setShowScoreModal(true)} 
+                    className="w-11 h-11 bg-green-600 hover:bg-green-500 text-white rounded-full flex items-center justify-center shadow-lg shadow-green-900/50 border border-white/20 active:scale-95 transition-transform"
+                 >
+                    <Flag fill="currentColor" size={20} />
+                 </button>
+             )}
+
+             {/* Menu Toggle */}
+             {!isReplay && (
+                 <button onClick={toggleMenu} className={`w-11 h-11 rounded-full flex items-center justify-center border shadow-lg transition-all active:scale-95 ${isMenuOpen ? 'bg-white text-black border-white' : 'bg-black/80 text-white border-white/10 backdrop-blur-md'}`}>
+                    {isMenuOpen ? <X size={20} /> : <Menu size={20} />}
+                 </button>
+             )}
+
+             {/* Collapsible Menu Items */}
+             {isMenuOpen && !isReplay && (
+                 <div className="flex flex-col gap-3 animate-in slide-in-from-top-4 fade-in duration-200 items-end">
+                     <button onClick={() => navigate('/settings/clubs', { state: { fromGame: true } })} className="flex items-center gap-2 bg-black/80 text-white px-4 py-2.5 rounded-full border border-white/10 shadow-xl backdrop-blur-md hover:bg-black transition-colors">
+                        <span className="text-xs font-bold mr-1">Bag</span>
+                        <GolfBagIcon size={18} />
+                     </button>
+                     <button onClick={() => setShowHoleSelect(true)} className="flex items-center gap-2 bg-black/80 text-white px-4 py-2.5 rounded-full border border-white/10 shadow-xl backdrop-blur-md hover:bg-black transition-colors">
+                        <span className="text-xs font-bold mr-1">Grid</span>
+                        <LayoutGrid size={18} />
+                     </button>
+                     <button onClick={() => setShowFullCard(true)} className="flex items-center gap-2 bg-black/80 text-white px-4 py-2.5 rounded-full border border-white/10 shadow-xl backdrop-blur-md hover:bg-black transition-colors">
+                        <span className="text-xs font-bold mr-1">Card</span>
+                        <ListChecks size={18} />
+                     </button>
+                     <button onClick={() => { setIsNoteMode(!isNoteMode); setIsMenuOpen(false); }} className={`flex items-center gap-2 px-4 py-2.5 rounded-full border shadow-xl backdrop-blur-md transition-colors ${isNoteMode ? 'bg-yellow-600 text-white border-yellow-500' : 'bg-black/80 text-white border-white/10 hover:bg-black'}`}>
+                        <span className="text-xs font-bold mr-1">Note</span>
+                        <PenTool size={18} />
+                     </button>
+                     <button onClick={() => navigate('/dashboard')} className="flex items-center gap-2 bg-red-900/80 text-white px-4 py-2.5 rounded-full border border-red-700/50 shadow-xl backdrop-blur-md hover:bg-red-900 transition-colors mt-2">
+                        <span className="text-xs font-bold mr-1">Exit</span>
+                        <Home size={18} />
+                     </button>
+                 </div>
+             )}
+
+             {/* Primary Tools (Always Visible below menu) */}
+             <button onClick={() => setShowWind(!showWind)} className={`w-11 h-11 rounded-full flex items-center justify-center border shadow-lg transition-all active:scale-95 ${showWind ? 'bg-blue-600 text-white border-blue-400' : 'bg-black/60 text-gray-300 border-white/5 backdrop-blur-md'}`}>
+                <Wind size={20} />
+             </button>
+             <button onClick={toggleMeasureMode} className={`w-11 h-11 rounded-full flex items-center justify-center border shadow-lg transition-all active:scale-95 ${isMeasureMode ? 'bg-blue-600 text-white border-blue-400' : 'bg-black/60 text-blue-400 border-white/5 backdrop-blur-md'}`}>
+                <Ruler size={20} />
+             </button>
+          </div>
+      </div>
+
+      {/* MEASURE MODE OVERLAY (Replaces Top HUD when active) */}
+      {isMeasureMode && (
+         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] pointer-events-auto bg-blue-600/90 backdrop-blur-xl px-6 py-3 rounded-2xl border border-blue-400/50 shadow-2xl text-center animate-in slide-in-from-top-4 w-64">
+              <div className="flex items-center justify-between gap-4 text-white">
+                  <div className="text-center">
+                      <div className="text-[10px] opacity-80 font-bold uppercase">From You</div>
+                      <div className="text-xl font-black">{MathUtils.formatDistance(measureDist1, useYards)}</div>
+                  </div>
+                  <div className="h-8 w-[1px] bg-blue-400/50"></div>
+                  <div className="text-center">
+                      <div className="text-[10px] opacity-80 font-bold uppercase">To Pin</div>
+                      <div className="text-xl font-black">{MathUtils.formatDistance(measureDist2, useYards)}</div>
+                  </div>
+              </div>
+              <div className="mt-2 pt-2 border-t border-blue-500/50 flex justify-between gap-2">
+                  <button onClick={handleMeasureGPS} className="flex-1 bg-blue-700 hover:bg-blue-800 rounded px-2 py-1.5 text-[10px] font-bold uppercase flex items-center justify-center gap-1 transition-colors">
+                      <MapPin size={10} /> Snap Me
+                  </button>
+                  <button onClick={toggleMeasureMode} className="flex-1 bg-blue-800 hover:bg-blue-900 rounded px-2 py-1.5 text-[10px] font-bold uppercase transition-colors">
+                      Done
+                  </button>
+              </div>
+         </div>
+      )}
+
+      {/* Wind Overlay */}
+      {showWind && (
+          <div className="absolute top-20 right-16 z-[1000] bg-black/90 backdrop-blur-xl p-4 rounded-2xl border border-gray-700 w-48 text-gray-300 shadow-2xl flex flex-col gap-4 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
+             <div className="flex items-center justify-between border-b border-gray-800 pb-2">
+                 <span className="font-bold text-white text-sm flex items-center gap-2"><Wind size={16}/> Wind</span>
+                 <span className="text-xs bg-blue-900/50 text-blue-300 px-2 py-0.5 rounded font-mono">{windSpeed} m/s</span>
+             </div>
+             <input type="range" min="0" max="20" value={windSpeed} onChange={(e) => setWindSpeed(parseInt(e.target.value))} className="w-full accent-blue-500 h-2 bg-gray-700 rounded-lg appearance-none" />
+             <div className="relative w-32 h-32 mx-auto select-none touch-none" onMouseDown={handleWindCircleInteract} onMouseMove={(e) => e.buttons === 1 && handleWindCircleInteract(e)} onTouchMove={handleWindCircleInteract}>
+                 <div className="absolute inset-0 rounded-full border-2 border-gray-700 bg-gray-800/50 shadow-inner"></div>
+                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none transition-transform" style={{ transform: `rotate(${windDir - baseBearing}deg)` }}>
+                     <div className="relative h-full w-full">
+                         <div className="absolute top-2 left-1/2 -translate-x-1/2">
+                             <div className="w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-b-[20px] border-b-blue-500 filter drop-shadow"></div>
+                         </div>
+                     </div>
+                 </div>
+                 <div className="absolute top-1/2 left-1/2 w-3 h-3 bg-gray-400 rounded-full -translate-x-1/2 -translate-y-1/2 shadow-lg z-10"></div>
+                 {/* Compass labels */}
+                 <span className="absolute top-1 left-1/2 -translate-x-1/2 text-[8px] text-gray-500 font-bold">N</span>
+                 <span className="absolute bottom-1 left-1/2 -translate-x-1/2 text-[8px] text-gray-500 font-bold">S</span>
+                 <span className="absolute left-1 top-1/2 -translate-y-1/2 text-[8px] text-gray-500 font-bold">W</span>
+                 <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[8px] text-gray-500 font-bold">E</span>
+             </div>
+          </div>
+      )}
+
+      {/* Note Tools Overlay (Bottom) */}
+      {!isReplay && isNoteMode && (
+          <div className="absolute bottom-0 w-full z-30 pt-2 px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] bg-black/80 backdrop-blur-md border-t border-white/10 animate-in slide-in-from-bottom-10">
+              <div className="flex justify-between items-center mb-2">
+                 <button onClick={() => setActiveTool('text')} className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-colors ${activeTool === 'text' ? 'bg-yellow-600 text-white' : 'text-gray-400'}`}>
+                    <Type size={20} /> <span className="text-[10px] font-bold">Text</span>
+                 </button>
+                 <button onClick={() => setActiveTool('pin')} className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-colors ${activeTool === 'pin' ? 'bg-yellow-600 text-white' : 'text-gray-400'}`}>
+                    <MapPin size={20} /> <span className="text-[10px] font-bold">Pin</span>
+                 </button>
+                 <button onClick={() => setActiveTool('draw')} className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-colors ${activeTool === 'draw' ? 'bg-yellow-600 text-white' : 'text-gray-400'}`}>
+                    <Highlighter size={20} /> <span className="text-[10px] font-bold">Draw</span>
+                 </button>
+                 <button onClick={() => setActiveTool('eraser')} className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-colors ${activeTool === 'eraser' ? 'bg-red-600 text-white' : 'text-gray-400'}`}>
+                    <Eraser size={20} /> <span className="text-[10px] font-bold">Eraser</span>
+                 </button>
+                 <button onClick={() => setIsNoteMode(false)} className="flex flex-col items-center gap-1 p-2 rounded-lg text-gray-500">
+                    <X size={20} /> <span className="text-[10px] font-bold">Close</span>
+                 </button>
+              </div>
+              
+              {activeTool === 'draw' && drawingPoints.length > 0 && (
+                  <div className="flex gap-2 mt-2">
+                      <button onClick={() => setDrawingPoints([])} className="flex-1 bg-gray-700 py-2 rounded-lg text-white font-bold text-xs flex items-center justify-center gap-2"><Trash2 size={12}/> Clear</button>
+                      <button onClick={saveDrawing} className="flex-1 bg-green-600 py-2 rounded-lg text-white font-bold text-xs flex items-center justify-center gap-2"><Check size={12}/> Save Line</button>
+                  </div>
+              )}
+          </div>
+      )}
+
+      {/* Replay Controls */}
       {isReplay && (
         <div className="absolute bottom-0 w-full z-30 pt-2 px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] flex justify-between items-center bg-gradient-to-t from-black/90 via-black/60 to-transparent">
             <button 
@@ -1014,43 +1185,21 @@ const PlayRound = () => {
             >
                 <span className="font-bold text-xs uppercase tracking-widest">Next</span> <ArrowRight size={20}/>
             </button>
+            
+            <button 
+                onClick={() => navigate('/summary', { state: { round: replayRound } })}
+                className="absolute top-[-60px] left-1/2 -translate-x-1/2 bg-gray-900 text-white px-4 py-2 rounded-full text-xs font-bold border border-gray-700 shadow-lg"
+            >
+                Exit Replay
+            </button>
         </div>
       )}
 
-      {!isReplay && isNoteMode && (
-          <div className="absolute bottom-0 w-full z-30 pt-2 px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] bg-black/80 backdrop-blur-md border-t border-white/10">
-              <div className="flex justify-between items-center mb-2">
-                 <button onClick={() => setActiveTool('text')} className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-colors ${activeTool === 'text' ? 'bg-yellow-600 text-white' : 'text-gray-400'}`}>
-                    <Type size={20} /> <span className="text-[10px] font-bold">Text</span>
-                 </button>
-                 <button onClick={() => setActiveTool('pin')} className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-colors ${activeTool === 'pin' ? 'bg-yellow-600 text-white' : 'text-gray-400'}`}>
-                    <MapPin size={20} /> <span className="text-[10px] font-bold">Pin</span>
-                 </button>
-                 <button onClick={() => setActiveTool('draw')} className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-colors ${activeTool === 'draw' ? 'bg-yellow-600 text-white' : 'text-gray-400'}`}>
-                    <Highlighter size={20} /> <span className="text-[10px] font-bold">Draw</span>
-                 </button>
-                 <button onClick={() => setActiveTool('eraser')} className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-colors ${activeTool === 'eraser' ? 'bg-red-600 text-white' : 'text-gray-400'}`}>
-                    <Eraser size={20} /> <span className="text-[10px] font-bold">Eraser</span>
-                 </button>
-              </div>
-              
-              {activeTool === 'draw' && drawingPoints.length > 0 && (
-                  <div className="flex gap-2 mt-2">
-                      <button onClick={() => setDrawingPoints([])} className="flex-1 bg-gray-700 py-2 rounded-lg text-white font-bold text-xs flex items-center justify-center gap-2"><Trash2 size={12}/> Clear</button>
-                      <button onClick={saveDrawing} className="flex-1 bg-green-600 py-2 rounded-lg text-white font-bold text-xs flex items-center justify-center gap-2"><Check size={12}/> Save Line</button>
-                  </div>
-              )}
-              
-              <div className="text-center text-[10px] text-gray-500 mt-2 pb-2">
-                  {activeTool === 'eraser' ? 'Tap an annotation to delete it' : activeTool === 'draw' ? 'Tap map to place points' : 'Tap map to place'}
-              </div>
-          </div>
-      )}
-
+      {/* Main Game Controls (Bottom) */}
       {!isReplay && !isNoteMode && (
-        <div className="absolute bottom-0 w-full z-30 pt-2 px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] bg-gradient-to-t from-black/95 via-black/80 to-transparent">
+        <div className="absolute bottom-0 w-full z-30 pt-2 px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] bg-gradient-to-t from-black/95 via-black/80 to-transparent pointer-events-none">
             {isTrackingMode ? (
-                 <div className="flex gap-3 h-20 items-stretch mb-2">
+                 <div className="flex gap-3 h-20 items-stretch mb-2 pointer-events-auto">
                     <div className="flex-1 bg-orange-900/80 rounded-2xl border border-orange-500/40 flex items-center justify-between px-6 backdrop-blur-md">
                         <div>
                             <div className="text-[10px] text-orange-200 uppercase font-bold tracking-widest mb-1 opacity-80 animate-pulse">Live Driving Distance</div>
@@ -1066,9 +1215,10 @@ const PlayRound = () => {
                     </button>
                  </div>
             ) : isMeasureMode ? (
-                <div className="flex gap-3 h-20 items-stretch mb-2"><div className="flex-1 bg-gray-900 rounded-2xl border border-blue-500/40 flex items-center justify-between px-4"><div className="flex-1 text-center border-r border-gray-700 py-2"><div className="text-[10px] text-blue-200 uppercase font-bold tracking-widest mb-1 opacity-80">From You</div><div className="text-3xl font-black text-blue-400 leading-none">{MathUtils.formatDistance(measureDist1, useYards)}</div></div><div className="flex-1 text-center py-2"><div className="text-[10px] text-gray-400 uppercase font-bold tracking-widest mb-1 opacity-80">To Pin</div><div className="text-3xl font-black text-white leading-none">{MathUtils.formatDistance(measureDist2, useYards)}</div></div></div><button onClick={handleMeasureGPS} className="w-20 bg-blue-600 text-white rounded-2xl flex flex-col items-center justify-center"><MapPin size={24} /><span className="text-[9px] font-bold">MY LOC</span></button></div>
+                 // Empty space because measure overlay is at top now
+                 <div className="h-4"></div>
             ) : (
-                <>
+                <div className="pointer-events-auto">
                     <div className="flex items-center gap-3 mb-3 bg-gray-900/90 backdrop-blur-md p-2 rounded-xl border border-white/5"><div className="text-gray-400 text-[10px] font-bold uppercase tracking-wider pl-1">Shot {shotNum}</div><div className="flex items-center gap-2 flex-1"><span className="text-[10px] font-bold text-gray-500">AIM</span><input type="range" min="-45" max="45" value={aimAngle} onChange={(e) => setAimAngle(parseInt(e.target.value))} className="flex-1 accent-white h-1 bg-gray-700 rounded-lg appearance-none" /><span className="text-[10px] font-bold text-gray-300 w-6 text-right">{aimAngle}°</span></div></div>
                     <div className="flex gap-3 h-16 items-stretch"><div className="flex-1 relative bg-gray-900 rounded-2xl border border-white/5 overflow-hidden flex"><div className="absolute inset-0 z-10 opacity-0"><ClubSelector clubs={bag} selectedClub={selectedClub} onSelect={setSelectedClub} useYards={useYards} /></div><div className="flex-1 flex flex-col justify-center pl-4 pr-1 border-r border-white/5 pointer-events-none"><span className="text-[9px] text-gray-500 uppercase font-bold tracking-widest mb-0.5">Club</span><div className="text-xl font-bold text-white truncate leading-none">{selectedClub.name}</div><div className="text-[10px] text-gray-500 mt-1">{MathUtils.formatDistance(useYards ? selectedClub.carry * 1.09361 : selectedClub.carry, useYards)}</div></div><div className="flex-1 flex flex-col justify-center items-end pr-4 pl-1 pointer-events-none bg-gray-800/30"><span className="text-[9px] text-gray-500 uppercase font-bold tracking-widest mb-0.5">Leaves</span><div className="text-xl font-bold text-white leading-none">{MathUtils.formatDistance(distLandingToGreen, useYards)}</div><div className="text-[10px] text-gray-500 mt-1 text-right truncate w-full"><span className="text-white font-medium">{nextClubSuggestion}</span></div></div></div>
                     
@@ -1105,10 +1255,11 @@ const PlayRound = () => {
                           </div>
                        )}
                     </div>
-                </>
+                </div>
             )}
         </div>
       )}
+
       {showHoleSelect && <HoleSelectorModal holes={activeCourse.holes} currentIdx={currentHoleIdx} onSelect={loadHole} onClose={() => setShowHoleSelect(false)} />}
       {showScoreModal && <ScoreModal par={hole.par} holeNum={hole.number} recordedShots={Math.max(0, shotNum - 1)} onSave={saveHoleScore} onClose={() => setShowScoreModal(false)} />}
       {showFullCard && <FullScorecardModal holes={activeCourse.holes} scorecard={scorecard} onFinishRound={finishRound} onClose={() => setShowFullCard(false)} />}
