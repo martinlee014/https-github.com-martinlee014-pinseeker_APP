@@ -69,8 +69,8 @@
           pointer-events: auto !important;
       }
 
-      /* Helper class for click-through map overlays */
-      .pointer-events-none {
+      /* Helper class for click-through map overlays - targets both internal content AND leaflet wrapper */
+      .pointer-events-none, .leaflet-marker-icon.pointer-events-none {
         pointer-events: none !important;
       }
     </style>

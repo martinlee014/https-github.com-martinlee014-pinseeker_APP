@@ -227,7 +227,7 @@ const GolfBagIcon = ({ size = 24, className = "" }: { size?: number, className?:
     strokeLinejoin="round" 
     className={className}
   >
-    <path d="M7 6h10v14a2 2 0 0 1-2 2H9a2 2 0 0 1-2 2H9a2 2 0 0 1-2 2H9a2 2 0 0 1-2 2H9a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V6z" />
+    <path d="M7 6h10v14a2 2 0 0 1-2 2H9a2 2 0 0 1-2 2H9a2 2 0 0 1-2 2H9a2 2 0 0 1-2 2H9a2 2 0 0 1-2 2H9a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V6z" />
     <path d="M9 6V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3" />
     <path d="M9 4l-2 2" />
     <path d="M15 4l2 2" />
@@ -257,6 +257,8 @@ const RotatedMapHandler = ({
 
   useEffect(() => {
     const container = map.getContainer();
+    // Force touch-action none to prevent browser handling of gestures
+    container.style.touchAction = 'none';
 
     const getClientPos = (e: MouseEvent | TouchEvent) => {
       if (window.TouchEvent && e instanceof TouchEvent) {
@@ -286,7 +288,13 @@ const RotatedMapHandler = ({
     };
 
     const handleStart = (e: MouseEvent | TouchEvent) => {
-      e.stopPropagation();
+      e.stopPropagation(); 
+      // Force prevent default on touch to fully claim the event from browser (prevents context menu, zoom, scroll)
+      // This is crucial for "long press" to work reliably on mobile over SVG elements
+      if (window.TouchEvent && e instanceof TouchEvent) {
+         if (e.touches.length === 1) e.preventDefault();
+      }
+
       if ((e as MouseEvent).button === 2) {
           e.preventDefault();
           return;
@@ -307,10 +315,15 @@ const RotatedMapHandler = ({
       startClientPos.current = pos;
 
       const target = e.target as HTMLElement;
-      // Prevent custom map handling if interacting with markers, popups, or any interactive Leaflet layer
-      const isBlocked = target.closest('.leaflet-interactive') || target.closest('.leaflet-popup-pane');
       
-      if (!isBlocked) {
+      // Determine if we should block the custom map handler
+      // We block if it's interactive AND NOT explicitly marked as pointer-events-none
+      const closestInteractive = target.closest('.leaflet-interactive');
+      const isActuallyBlocked = closestInteractive && !target.closest('.pointer-events-none') && !target.classList.contains('pointer-events-none');
+      
+      const isPopup = target.closest('.leaflet-popup-pane');
+      
+      if (!isActuallyBlocked && !isPopup) {
           longPressTimer.current = setTimeout(() => {
               isDragging.current = false;
               if (!hasMovedSignificantly.current && !isMultiTouch.current) {
@@ -331,7 +344,8 @@ const RotatedMapHandler = ({
       const currentPos = getClientPos(e);
       if (startClientPos.current) {
           const moveDist = Math.sqrt(Math.pow(currentPos.x - startClientPos.current.x, 2) + Math.pow(currentPos.y - startClientPos.current.y, 2));
-          if (moveDist > 20) { 
+          // Tolerance for finger wiggle
+          if (moveDist > 50) { 
               hasMovedSignificantly.current = true;
               if (longPressTimer.current) clearTimeout(longPressTimer.current);
           }
@@ -361,8 +375,11 @@ const RotatedMapHandler = ({
       }
       if (startClientPos.current && !hasMovedSignificantly.current) {
          const target = e.target as HTMLElement;
-         const isMarker = target.closest('.leaflet-interactive');
-         if (!isMarker) {
+         const closestInteractive = target.closest('.leaflet-interactive');
+         // Same check as handleStart to determine if we should fire click
+         const isActuallyBlocked = closestInteractive && !target.closest('.pointer-events-none') && !target.classList.contains('pointer-events-none');
+
+         if (!isActuallyBlocked) {
              const latlng = calculateLatLng(startClientPos.current);
              onClick({ lat: latlng.lat, lng: latlng.lng });
          }
@@ -813,7 +830,7 @@ const PlayRound = () => {
               <Marker position={[hole.green.lat, hole.green.lng]} icon={flagIcon} />
               {annotations.map(note => {
                  const handlers = isNoteMode ? { click: () => activeTool === 'eraser' && deleteAnnotation(note.id) } : {};
-                 if (note.type === 'path') return <Polyline key={note.id} positions={note.points.map(p => [p.lat, p.lng])} pathOptions={{ color: '#facc15', weight: 3, dashArray: '5,5', opacity: 0.8, interactive: true }} eventHandlers={handlers} />;
+                 if (note.type === 'path') return <Polyline key={note.id} positions={note.points.map(p => [p.lat, p.lng])} pathOptions={{ color: '#facc15', weight: 3, dashArray: '5,5', opacity: 0.8 }} interactive={true} eventHandlers={handlers} />;
                  if (note.type === 'text') return <Marker key={note.id} position={[note.points[0].lat, note.points[0].lng]} icon={createAnnotationTextIcon(note.text || "", -mapRotation)} eventHandlers={handlers} />;
                  if (note.type === 'icon') return <Marker key={note.id} position={[note.points[0].lat, note.points[0].lng]} icon={userFlagIcon} eventHandlers={handlers} />;
                  return null;
@@ -821,7 +838,7 @@ const PlayRound = () => {
               {isNoteMode && drawingPoints.length > 0 && (
                   <>
                       {drawingPoints.map((p, i) => <Marker key={i} position={[p.lat, p.lng]} icon={measureTargetIcon} />)}
-                      <Polyline positions={drawingPoints.map(p => [p.lat, p.lng])} pathOptions={{ color: '#facc15', weight: 2, dashArray: '2,4', interactive: false }} />
+                      <Polyline positions={drawingPoints.map(p => [p.lat, p.lng])} pathOptions={{ color: '#facc15', weight: 2, dashArray: '2,4' }} interactive={false} />
                   </>
               )}
               {holeShots.map((s, i) => {
@@ -837,26 +854,31 @@ const PlayRound = () => {
                                     s.plannedInfo.dispersion.depth, 
                                     s.plannedInfo.dispersion.rotation
                                 ).map(p => [p.lat, p.lng] as [number, number])} 
-                                pathOptions={{ color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.1, weight: 1, dashArray: '2, 4', interactive: false, className: 'pointer-events-none' }} 
+                                pathOptions={{ color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.1, weight: 1, dashArray: '2, 4', className: 'pointer-events-none' }} 
+                                interactive={false}
                               />
                               <Polyline 
                                 positions={[[s.from.lat, s.from.lng], [s.plannedInfo.target.lat, s.plannedInfo.target.lng]]} 
-                                pathOptions={{ color: "#3b82f6", weight: 1, dashArray: "5, 5", opacity: 0.3, interactive: false, className: 'pointer-events-none' }} 
+                                pathOptions={{ color: "#3b82f6", weight: 1, dashArray: "5, 5", opacity: 0.3, className: 'pointer-events-none' }} 
+                                interactive={false}
                               />
                             </>
                           )}
                           <Marker position={[s.from.lat, s.from.lng]} icon={s.shotNumber === 1 ? startMarkerIcon : ballIcon} />
                           <Polyline 
                               positions={[[s.from.lat, s.from.lng], [s.to.lat, s.to.lng]]} 
-                              pathOptions={{ color: '#cbd5e1', weight: 4, opacity: 0.25, interactive: false, className: 'pointer-events-none' }} 
+                              pathOptions={{ color: '#cbd5e1', weight: 4, opacity: 0.25, className: 'pointer-events-none' }} 
+                              interactive={false}
                           />
                           <Polyline 
                               positions={arcPoints as any} 
-                              pathOptions={{ color: 'black', weight: 5, opacity: 0.6, lineCap: 'round', interactive: false }} 
+                              pathOptions={{ color: 'black', weight: 5, opacity: 0.6, lineCap: 'round' }} 
+                              interactive={false}
                           />
                           <Polyline 
                               positions={arcPoints as any} 
-                              pathOptions={{ color: '#ffff00', weight: 3, opacity: 1, lineCap: 'round', interactive: false }} 
+                              pathOptions={{ color: '#ffff00', weight: 3, opacity: 1, lineCap: 'round' }} 
+                              interactive={false}
                           />
 
                           {isReplay ? <Marker position={[s.to.lat, s.to.lng]} icon={createReplayLabelIcon(`${s.clubUsed} - ${MathUtils.formatDistance(s.distance, useYards)}`, -mapRotation)} /> : <Marker position={[s.to.lat, s.to.lng]} icon={targetIcon} eventHandlers={{ contextmenu: (e) => { e.originalEvent.preventDefault(); setShotToDelete(s); } }} />}
@@ -866,27 +888,27 @@ const PlayRound = () => {
               {!isReplay && !isMeasureMode && !isNoteMode && !isTrackingMode && (
                   <>
                       <Marker position={[currentBallPos.lat, currentBallPos.lng]} icon={shotNum === 1 ? startMarkerIcon : ballIcon} />
-                      <Polyline positions={[[currentBallPos.lat, currentBallPos.lng], [predictedLanding.lat, predictedLanding.lng]]} pathOptions={{ color: "black", weight: 4, opacity: 0.3, interactive: false, className: 'pointer-events-none' }} />
-                      <Polyline positions={[[currentBallPos.lat, currentBallPos.lng], [predictedLanding.lat, predictedLanding.lng]]} pathOptions={{ color: "#3b82f6", weight: 2, dashArray: "5, 5", interactive: false, className: 'pointer-events-none' }} />
-                      <Polygon positions={ellipsePoints} pathOptions={{ color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.2, weight: 1, interactive: false, className: 'pointer-events-none' }} />
+                      <Polyline positions={[[currentBallPos.lat, currentBallPos.lng], [predictedLanding.lat, predictedLanding.lng]]} pathOptions={{ color: "black", weight: 4, opacity: 0.3, className: 'pointer-events-none' }} interactive={false} />
+                      <Polyline positions={[[currentBallPos.lat, currentBallPos.lng], [predictedLanding.lat, predictedLanding.lng]]} pathOptions={{ color: "#3b82f6", weight: 2, dashArray: "5, 5", className: 'pointer-events-none' }} interactive={false} />
+                      <Polygon positions={ellipsePoints} pathOptions={{ color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.2, weight: 1, className: 'pointer-events-none' }} interactive={false} />
                       <Marker position={[predictedLanding.lat, predictedLanding.lng]} icon={createArrowIcon(shotBearing)} interactive={false} />
-                      <Polyline positions={guideLinePoints as any} pathOptions={{ color: "#fbbf24", weight: 2, dashArray: "4, 6", opacity: 0.8, interactive: false, className: 'pointer-events-none' }} />
+                      <Polyline positions={guideLinePoints as any} pathOptions={{ color: "#fbbf24", weight: 2, dashArray: "4, 6", opacity: 0.8, className: 'pointer-events-none' }} interactive={false} />
                       <Marker position={[guideLabelPos.lat, guideLabelPos.lng]} icon={createDistanceLabelIcon(`Leaves ${MathUtils.formatDistance(distLandingToGreen, useYards)}`, -mapRotation)} interactive={false} />
                   </>
               )}
               {isTrackingMode && trackingStartPos && liveLocation && (
                   <>
                       <Marker position={[trackingStartPos.lat, trackingStartPos.lng]} icon={startMarkerIcon} />
-                      <Polyline positions={[[trackingStartPos.lat, trackingStartPos.lng], [liveLocation.lat, liveLocation.lng]]} pathOptions={{ color: '#f97316', weight: 4, dashArray: '10, 10', opacity: 0.8, interactive: false }} />
+                      <Polyline positions={[[trackingStartPos.lat, trackingStartPos.lng], [liveLocation.lat, liveLocation.lng]]} pathOptions={{ color: '#f97316', weight: 4, dashArray: '10, 10', opacity: 0.8 }} interactive={false} />
                   </>
               )}
               {!isReplay && isMeasureMode && activeMeasureTarget && (
                   <>
                       <Marker position={[currentBallPos.lat, currentBallPos.lng]} icon={draggableMeasureStartIcon} draggable={true} eventHandlers={{ dragend: (e) => setCurrentBallPos(e.target.getLatLng()) }} zIndexOffset={1000} />
                       <Marker position={[activeMeasureTarget.lat, activeMeasureTarget.lng]} icon={measureTargetIcon} />
-                      <Polyline positions={[[currentBallPos.lat, currentBallPos.lng], [activeMeasureTarget.lat, activeMeasureTarget.lng]]} pathOptions={{ color: "black", weight: 6, opacity: 0.3, interactive: false, className: 'pointer-events-none' }} />
-                      <Polyline positions={[[currentBallPos.lat, currentBallPos.lng], [activeMeasureTarget.lat, activeMeasureTarget.lng]]} pathOptions={{ color: "#60a5fa", weight: 3, opacity: 1, interactive: false, className: 'pointer-events-none' }} />
-                      <Polyline positions={[[activeMeasureTarget.lat, activeMeasureTarget.lng], [hole.green.lat, hole.green.lng]]} pathOptions={{ color: "#ffffff", weight: 3, dashArray: "8, 8", opacity: 0.8, interactive: false, className: 'pointer-events-none' }} />
+                      <Polyline positions={[[currentBallPos.lat, currentBallPos.lng], [activeMeasureTarget.lat, activeMeasureTarget.lng]]} pathOptions={{ color: "black", weight: 6, opacity: 0.3, className: 'pointer-events-none' }} interactive={false} />
+                      <Polyline positions={[[currentBallPos.lat, currentBallPos.lng], [activeMeasureTarget.lat, activeMeasureTarget.lng]]} pathOptions={{ color: "#60a5fa", weight: 3, opacity: 1, className: 'pointer-events-none' }} interactive={false} />
+                      <Polyline positions={[[activeMeasureTarget.lat, activeMeasureTarget.lng], [hole.green.lat, hole.green.lng]]} pathOptions={{ color: "#ffffff", weight: 3, dashArray: "8, 8", opacity: 0.8, className: 'pointer-events-none' }} interactive={false} />
                       <Marker position={[labelPos1.lat, labelPos1.lng]} icon={createDistanceLabelIcon(MathUtils.formatDistance(measureDist1, useYards), -mapRotation, '#60a5fa')} interactive={false} />
                       <Marker position={[labelPos2.lat, labelPos2.lng]} icon={createDistanceLabelIcon(MathUtils.formatDistance(measureDist2, useYards), -mapRotation, '#ffffff')} interactive={false} />
                   </>
