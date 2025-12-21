@@ -257,7 +257,6 @@ const RotatedMapHandler = ({
 
   useEffect(() => {
     const container = map.getContainer();
-    // Force touch-action none to prevent browser handling of gestures
     container.style.touchAction = 'none';
 
     const getClientPos = (e: MouseEvent | TouchEvent) => {
@@ -289,8 +288,6 @@ const RotatedMapHandler = ({
 
     const handleStart = (e: MouseEvent | TouchEvent) => {
       e.stopPropagation(); 
-      // Force prevent default on touch to fully claim the event from browser (prevents context menu, zoom, scroll)
-      // This is crucial for "long press" to work reliably on mobile over SVG elements
       if (window.TouchEvent && e instanceof TouchEvent) {
          if (e.touches.length === 1) e.preventDefault();
       }
@@ -316,11 +313,8 @@ const RotatedMapHandler = ({
 
       const target = e.target as HTMLElement;
       
-      // Determine if we should block the custom map handler
-      // We block if it's interactive AND NOT explicitly marked as pointer-events-none
       const closestInteractive = target.closest('.leaflet-interactive');
       const isActuallyBlocked = closestInteractive && !target.closest('.pointer-events-none') && !target.classList.contains('pointer-events-none');
-      
       const isPopup = target.closest('.leaflet-popup-pane');
       
       if (!isActuallyBlocked && !isPopup) {
@@ -344,7 +338,6 @@ const RotatedMapHandler = ({
       const currentPos = getClientPos(e);
       if (startClientPos.current) {
           const moveDist = Math.sqrt(Math.pow(currentPos.x - startClientPos.current.x, 2) + Math.pow(currentPos.y - startClientPos.current.y, 2));
-          // Tolerance for finger wiggle
           if (moveDist > 50) { 
               hasMovedSignificantly.current = true;
               if (longPressTimer.current) clearTimeout(longPressTimer.current);
@@ -376,7 +369,6 @@ const RotatedMapHandler = ({
       if (startClientPos.current && !hasMovedSignificantly.current) {
          const target = e.target as HTMLElement;
          const closestInteractive = target.closest('.leaflet-interactive');
-         // Same check as handleStart to determine if we should fire click
          const isActuallyBlocked = closestInteractive && !target.closest('.pointer-events-none') && !target.classList.contains('pointer-events-none');
 
          if (!isActuallyBlocked) {
@@ -483,6 +475,11 @@ const PlayRound = () => {
   const [isTrackingMode, setIsTrackingMode] = useState(false);
   const [trackingStartPos, setTrackingStartPos] = useState<LatLng | null>(null);
 
+  // Tee Off Long Press Logic
+  const teePressTimer = useRef<any>(null);
+  const [teeButtonText, setTeeButtonText] = useState("TEE OFF");
+  const [isTeePressing, setIsTeePressing] = useState(false);
+
   const hole = activeCourse.holes[currentHoleIdx];
 
   const drivingDist = useMemo(() => {
@@ -567,7 +564,32 @@ const PlayRound = () => {
 
   if (!hole) return <div className="p-10 text-white">Loading Hole Data...</div>;
 
+  // -- LOGIC START FOR GREEN POINTS DEFAULTING --
+  // Calculate orientation of the hole (Tee -> Green) to determine Front/Back
+  const holeOrientation = useMemo(() => MathUtils.calculateBearing(hole.tee, hole.green), [hole]);
+  
+  // Default radius (15 yards ~ 13.716 meters)
+  const defaultRadiusMeters = 13.716;
+
+  // If user hasn't set custom points, calculate defaults based on 15y radius
+  const activeGreenFront = useMemo(() => {
+      if (hole.greenFront) return hole.greenFront;
+      // Front is "short" of the green center, so bearing + 180 (back towards tee)
+      return MathUtils.calculateDestination(hole.green, defaultRadiusMeters, holeOrientation + 180);
+  }, [hole, holeOrientation]);
+
+  const activeGreenBack = useMemo(() => {
+      if (hole.greenBack) return hole.greenBack;
+      // Back is "long" of the green center, so bearing is same as hole orientation
+      return MathUtils.calculateDestination(hole.green, defaultRadiusMeters, holeOrientation);
+  }, [hole, holeOrientation]);
+
+  // Calculate Distances
   const distToGreen = useMemo(() => MathUtils.calculateDistance(currentBallPos, hole.green), [currentBallPos, hole]);
+  const distToFront = useMemo(() => MathUtils.calculateDistance(currentBallPos, activeGreenFront), [currentBallPos, activeGreenFront]);
+  const distToBack = useMemo(() => MathUtils.calculateDistance(currentBallPos, activeGreenBack), [currentBallPos, activeGreenBack]);
+  // -- LOGIC END --
+
   const baseBearing = useMemo(() => MathUtils.calculateBearing(currentBallPos, hole.green), [currentBallPos, hole]);
   const shotBearing = baseBearing + aimAngle;
   const mapRotation = -baseBearing;
@@ -814,6 +836,33 @@ const PlayRound = () => {
       setWindDir(Math.round((baseBearing + angleDeg) % 360));
   };
 
+  const handleTeeDown = (e: React.PointerEvent) => {
+    e.preventDefault();
+    setIsTeePressing(true);
+    teePressTimer.current = setTimeout(() => {
+        if (liveLocation) {
+            setCurrentBallPos(liveLocation);
+            if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
+            setTeeButtonText("FROM GPS");
+            setTimeout(() => setTeeButtonText("TEE OFF"), 2000);
+        } else {
+            alert("Waiting for GPS...");
+        }
+        teePressTimer.current = null; // Mark as consumed
+        setIsTeePressing(false);
+    }, 3000);
+  };
+
+  const handleTeeUp = (e: React.PointerEvent) => {
+    e.preventDefault();
+    setIsTeePressing(false);
+    if (teePressTimer.current) {
+        clearTimeout(teePressTimer.current);
+        teePressTimer.current = null;
+        handleStartShot();
+    }
+  };
+
   return (
     <div className="h-full relative bg-gray-900 flex flex-col overflow-hidden select-none touch-none" onContextMenu={(e) => e.preventDefault()}>
       <div className="absolute inset-0 z-0 bg-black w-full h-full overflow-hidden">
@@ -830,7 +879,7 @@ const PlayRound = () => {
               <Marker position={[hole.green.lat, hole.green.lng]} icon={flagIcon} />
               {annotations.map(note => {
                  const handlers = isNoteMode ? { click: () => activeTool === 'eraser' && deleteAnnotation(note.id) } : {};
-                 if (note.type === 'path') return <Polyline key={note.id} positions={note.points.map(p => [p.lat, p.lng])} pathOptions={{ color: '#facc15', weight: 3, dashArray: '5,5', opacity: 0.8 }} interactive={true} eventHandlers={handlers} />;
+                 if (note.type === 'path') return <Polyline key={note.id} positions={note.points.map(p => [p.lat, p.lng])} pathOptions={{ color: '#facc15', weight: 3, dashArray: '5,5', opacity: 0.8, className: 'pointer-events-none' }} interactive={true} eventHandlers={handlers} />;
                  if (note.type === 'text') return <Marker key={note.id} position={[note.points[0].lat, note.points[0].lng]} icon={createAnnotationTextIcon(note.text || "", -mapRotation)} eventHandlers={handlers} />;
                  if (note.type === 'icon') return <Marker key={note.id} position={[note.points[0].lat, note.points[0].lng]} icon={userFlagIcon} eventHandlers={handlers} />;
                  return null;
@@ -838,7 +887,7 @@ const PlayRound = () => {
               {isNoteMode && drawingPoints.length > 0 && (
                   <>
                       {drawingPoints.map((p, i) => <Marker key={i} position={[p.lat, p.lng]} icon={measureTargetIcon} />)}
-                      <Polyline positions={drawingPoints.map(p => [p.lat, p.lng])} pathOptions={{ color: '#facc15', weight: 2, dashArray: '2,4' }} interactive={false} />
+                      <Polyline positions={drawingPoints.map(p => [p.lat, p.lng])} pathOptions={{ color: '#facc15', weight: 2, dashArray: '2,4', className: 'pointer-events-none' }} interactive={false} />
                   </>
               )}
               {holeShots.map((s, i) => {
@@ -927,7 +976,17 @@ const PlayRound = () => {
         <div className="text-center mt-1 drop-shadow-lg pointer-events-none">
           <div className="flex items-center justify-center gap-1.5 mb-1 opacity-80">{isReplay ? <span className="text-[10px] text-gray-400 bg-black/60 px-2 rounded-md font-black tracking-widest">ANALYSIS</span> : <div className="flex items-center gap-1 bg-black/60 px-2 py-0.5 rounded-md backdrop-blur-md">{gpsSignalLevel === 3 ? <Signal size={14} className="text-blue-500" /> : <SignalLow size={14} className="text-red-500" />}<span className="text-[10px] font-mono text-gray-300">{gpsAccuracy ? `±${Math.round(gpsAccuracy)}m` : 'NO GPS'}</span></div>}</div>
           <h2 className="text-2xl font-black text-white">HOLE {hole.number}</h2>
-          <div className="flex items-center justify-center gap-2 text-xs font-bold bg-black/60 rounded-full px-3 py-1 backdrop-blur-md border border-white/10 shadow-lg"><span className="text-gray-300">PAR {hole.par}</span><span className="text-gray-500">|</span><span className="text-white">{MathUtils.formatDistance(distToGreen, useYards)}</span></div>
+          <div className="flex flex-col items-center justify-center gap-1 bg-black/60 rounded-xl px-3 py-1 backdrop-blur-md border border-white/10 shadow-lg">
+              <div className="flex gap-2 text-xs font-bold">
+                  <span className="text-gray-300">PAR {hole.par}</span>
+                  <span className="text-gray-500">|</span>
+                  <span className="text-white">{MathUtils.formatDistance(distToGreen, useYards)}</span>
+              </div>
+              <div className="flex gap-2 text-[10px] font-mono border-t border-white/10 pt-0.5 mt-0.5 w-full justify-center">
+                  <span className="text-blue-300">F:{Math.round(useYards ? distToFront * 1.09361 : distToFront)}</span>
+                  <span className="text-red-300">B:{Math.round(useYards ? distToBack * 1.09361 : distToBack)}</span>
+              </div>
+          </div>
         </div>
         <div className="pointer-events-auto flex flex-col gap-2 items-end">
            {!isReplay && <><button onClick={() => setShowScoreModal(true)} className="bg-green-600/90 p-2.5 rounded-full text-white shadow-lg shadow-green-900/50"><Flag size={20} fill="white"/></button><button onClick={toggleMeasureMode} className={`p-2.5 rounded-full shadow-lg ${isMeasureMode ? 'bg-blue-600 text-white' : 'bg-black/50 text-blue-400'}`}><Ruler size={20} /></button><button onClick={() => setIsNoteMode(!isNoteMode)} className={`p-2.5 rounded-full shadow-lg ${isNoteMode ? 'bg-yellow-600 text-white' : 'bg-black/50 text-yellow-400'}`}><PenTool size={20} /></button><button onClick={() => setShowWind(!showWind)} className="bg-black/50 p-2.5 rounded-full text-gray-400"><Wind size={20} /></button></>}
@@ -1014,9 +1073,14 @@ const PlayRound = () => {
                     <div className="flex gap-3 h-16 items-stretch"><div className="flex-1 relative bg-gray-900 rounded-2xl border border-white/5 overflow-hidden flex"><div className="absolute inset-0 z-10 opacity-0"><ClubSelector clubs={bag} selectedClub={selectedClub} onSelect={setSelectedClub} useYards={useYards} /></div><div className="flex-1 flex flex-col justify-center pl-4 pr-1 border-r border-white/5 pointer-events-none"><span className="text-[9px] text-gray-500 uppercase font-bold tracking-widest mb-0.5">Club</span><div className="text-xl font-bold text-white truncate leading-none">{selectedClub.name}</div><div className="text-[10px] text-gray-500 mt-1">{MathUtils.formatDistance(useYards ? selectedClub.carry * 1.09361 : selectedClub.carry, useYards)}</div></div><div className="flex-1 flex flex-col justify-center items-end pr-4 pl-1 pointer-events-none bg-gray-800/30"><span className="text-[9px] text-gray-500 uppercase font-bold tracking-widest mb-0.5">Leaves</span><div className="text-xl font-bold text-white leading-none">{MathUtils.formatDistance(distLandingToGreen, useYards)}</div><div className="text-[10px] text-gray-500 mt-1 text-right truncate w-full"><span className="text-white font-medium">{nextClubSuggestion}</span></div></div></div>
                     
                     {shotNum === 1 ? (
-                           <button onClick={handleStartShot} className="w-20 bg-gradient-to-b from-blue-500 to-blue-600 text-white rounded-2xl flex flex-col items-center justify-center shadow-lg shadow-blue-900/50 active:scale-95 transition-all border border-blue-400/20">
-                                <div className="text-[20px]">🚀</div>
-                                <span className="text-[9px] font-black uppercase tracking-wide mt-0.5">TEE OFF</span>
+                           <button 
+                                onPointerDown={handleTeeDown}
+                                onPointerUp={handleTeeUp}
+                                onPointerLeave={handleTeeUp}
+                                className={`w-20 bg-gradient-to-b from-blue-500 to-blue-600 text-white rounded-2xl flex flex-col items-center justify-center shadow-lg shadow-blue-900/50 transition-all border border-blue-400/20 select-none ${isTeePressing ? 'scale-90 bg-blue-700 ring-2 ring-blue-400 ring-opacity-50' : 'active:scale-95'}`}
+                           >
+                                <div className="text-[20px]">{teeButtonText === "TEE OFF" ? "🚀" : "🛰️"}</div>
+                                <span className="text-[9px] font-black uppercase tracking-wide mt-0.5 whitespace-nowrap">{teeButtonText}</span>
                            </button>
                        ) : (
                           <div className="flex flex-col gap-1.5 h-full">

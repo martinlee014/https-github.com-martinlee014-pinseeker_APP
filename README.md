@@ -49,8 +49,8 @@ git init
 # 2. Add all files to the staging area
 git add .
 
-# 3. Commit the changes (Version 7.17.1)
-git commit -m "fix: restore annotation toolbar and map interaction v7.17.1"
+# 3. Commit the changes (Version 7.18.0)
+git commit -m "feat: upgrade round analysis stats and add gps tee feature v7.18.0"
 
 # 4. Ensure you are on the main branch
 git branch -M main
@@ -77,4 +77,4 @@ npm run dev
 
 ## 📜 Version History
 
-See [DEV_LOG.md](./DEV_LOG.md) for detailed development logs.
+See [DEV_LOG.md](./docs/DEV_LOG.md) for detailed development logs.

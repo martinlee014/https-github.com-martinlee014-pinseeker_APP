@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useContext, Fragment, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, useMapEvents, Polyline, useMap } from 'react-leaflet';
@@ -6,7 +7,7 @@ import { AppContext } from '../App';
 import { StorageService } from '../services/storage';
 import * as MathUtils from '../services/mathUtils';
 import { GolfCourse, GolfHole } from '../types';
-import { ChevronLeft, Save, MapPin, Target, Search, Loader2, ArrowLeft, ArrowRight, Check, X, Edit3, Home } from 'lucide-react';
+import { ChevronLeft, Save, MapPin, Target, Search, Loader2, ArrowLeft, ArrowRight, Check, X, Edit3, Home, Plus, Maximize, ArrowDownToLine, ArrowUpToLine, ArrowLeftToLine, ArrowRightToLine } from 'lucide-react';
 import { ModalOverlay } from '../components/Modals';
 
 // --- Icons Configuration ---
@@ -39,6 +40,13 @@ const miniGreenIcon = new L.DivIcon({
   html: `<div style="width: 10px; height: 10px; background-color: #ef4444; border-radius: 50%; border: 2px solid #7f1d1d;"></div>`,
   iconSize: [10, 10],
   iconAnchor: [5, 5]
+});
+
+const edgeIcon = (color: string) => new L.DivIcon({
+  className: 'edge-icon',
+  html: `<div style="width: 8px; height: 8px; background-color: ${color}; border-radius: 50%; border: 1px solid white; box-shadow: 0 0 4px black;"></div>`,
+  iconSize: [8, 8],
+  iconAnchor: [4, 4]
 });
 
 const createHoleLabel = (text: string, isActive: boolean) => new L.DivIcon({
@@ -83,7 +91,7 @@ const createDirectionArrow = (rotation: number, isActive: boolean) => new L.DivI
 });
 
 
-const EditorMapEvents = ({ mode, onSetPoint }: { mode: 'tee' | 'green' | null, onSetPoint: (lat: number, lng: number) => void }) => {
+const EditorMapEvents = ({ mode, onSetPoint }: { mode: string | null, onSetPoint: (lat: number, lng: number) => void }) => {
     useMapEvents({
         click(e) {
             if (mode) {
@@ -101,6 +109,8 @@ const MapUpdater = ({ center }: { center: [number, number] }) => {
     }, [center, map]);
     return null;
 };
+
+type EditMode = 'tee' | 'green' | 'green-front' | 'green-back' | 'green-left' | 'green-right' | null;
 
 const CourseEditor = () => {
   const navigate = useNavigate();
@@ -124,7 +134,8 @@ const CourseEditor = () => {
   );
 
   const [currentHoleIdx, setCurrentHoleIdx] = useState(0);
-  const [editMode, setEditMode] = useState<'tee' | 'green' | null>(null);
+  const [editMode, setEditMode] = useState<EditMode>(null);
+  const [greenSubMode, setGreenSubMode] = useState<'center' | 'front' | 'back' | 'left' | 'right'>('center');
   
   const [mapCenter, setMapCenter] = useState<[number, number]>([51.253031, 6.610690]); 
 
@@ -222,18 +233,34 @@ const CourseEditor = () => {
           newHoles[currentHoleIdx].tee = { lat, lng };
       } else if (editMode === 'green') {
           newHoles[currentHoleIdx].green = { lat, lng };
+      } else if (editMode === 'green-front') {
+          newHoles[currentHoleIdx].greenFront = { lat, lng };
+      } else if (editMode === 'green-back') {
+          newHoles[currentHoleIdx].greenBack = { lat, lng };
+      } else if (editMode === 'green-left') {
+          newHoles[currentHoleIdx].greenLeft = { lat, lng };
+      } else if (editMode === 'green-right') {
+          newHoles[currentHoleIdx].greenRight = { lat, lng };
       }
       setHoles(newHoles);
       setEditMode(null); 
   };
 
-  const handleMarkerDragEnd = (e: any, type: 'tee' | 'green', holeIdx: number) => {
+  const handleMarkerDragEnd = (e: any, type: EditMode, holeIdx: number) => {
       const newPos = e.target.getLatLng();
       const newHoles = [...holes];
       if (type === 'tee') {
           newHoles[holeIdx].tee = { lat: newPos.lat, lng: newPos.lng };
-      } else {
+      } else if (type === 'green') {
           newHoles[holeIdx].green = { lat: newPos.lat, lng: newPos.lng };
+      } else if (type === 'green-front') {
+          newHoles[holeIdx].greenFront = { lat: newPos.lat, lng: newPos.lng };
+      } else if (type === 'green-back') {
+          newHoles[holeIdx].greenBack = { lat: newPos.lat, lng: newPos.lng };
+      } else if (type === 'green-left') {
+          newHoles[holeIdx].greenLeft = { lat: newPos.lat, lng: newPos.lng };
+      } else if (type === 'green-right') {
+          newHoles[holeIdx].greenRight = { lat: newPos.lat, lng: newPos.lng };
       }
       setHoles(newHoles);
   };
@@ -255,6 +282,12 @@ const CourseEditor = () => {
   const currentHole = holes[currentHoleIdx];
   const hasTee = currentHole.tee.lat !== 0;
   const hasGreen = currentHole.green.lat !== 0;
+
+  const setGreenMode = (sub: 'center' | 'front' | 'back' | 'left' | 'right') => {
+      setGreenSubMode(sub);
+      if (sub === 'center') setEditMode('green');
+      else setEditMode(`green-${sub}` as EditMode);
+  };
 
   const summaryStats = useMemo(() => {
     let totalDist = 0;
@@ -404,7 +437,7 @@ const CourseEditor = () => {
                                 />
                             )}
 
-                            {/* Green Marker */}
+                            {/* Green Center Marker */}
                             {isGreenSet && (
                                 <Marker 
                                     position={[hole.green.lat, hole.green.lng]} 
@@ -414,6 +447,44 @@ const CourseEditor = () => {
                                     eventHandlers={{
                                         dragend: (e) => handleMarkerDragEnd(e, 'green', idx)
                                     }}
+                                />
+                            )}
+
+                            {/* Green Edges - Only show for active hole */}
+                            {isActive && hole.greenFront && (
+                                <Marker 
+                                    position={[hole.greenFront.lat, hole.greenFront.lng]} 
+                                    icon={edgeIcon('#3b82f6')} 
+                                    zIndexOffset={1001}
+                                    draggable={true} 
+                                    eventHandlers={{ dragend: (e) => handleMarkerDragEnd(e, 'green-front', idx) }}
+                                />
+                            )}
+                            {isActive && hole.greenBack && (
+                                <Marker 
+                                    position={[hole.greenBack.lat, hole.greenBack.lng]} 
+                                    icon={edgeIcon('#ef4444')} 
+                                    zIndexOffset={1001}
+                                    draggable={true} 
+                                    eventHandlers={{ dragend: (e) => handleMarkerDragEnd(e, 'green-back', idx) }}
+                                />
+                            )}
+                            {isActive && hole.greenLeft && (
+                                <Marker 
+                                    position={[hole.greenLeft.lat, hole.greenLeft.lng]} 
+                                    icon={edgeIcon('#eab308')} 
+                                    zIndexOffset={1001}
+                                    draggable={true} 
+                                    eventHandlers={{ dragend: (e) => handleMarkerDragEnd(e, 'green-left', idx) }}
+                                />
+                            )}
+                            {isActive && hole.greenRight && (
+                                <Marker 
+                                    position={[hole.greenRight.lat, hole.greenRight.lng]} 
+                                    icon={edgeIcon('#eab308')} 
+                                    zIndexOffset={1001}
+                                    draggable={true} 
+                                    eventHandlers={{ dragend: (e) => handleMarkerDragEnd(e, 'green-right', idx) }}
                                 />
                             )}
                         </Fragment>
@@ -440,7 +511,7 @@ const CourseEditor = () => {
             {/* Editing Overlay Instruction */}
             {editMode && (
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/80 text-white px-4 py-2 rounded-full text-sm font-bold pointer-events-none z-[1000] border border-white/20 animate-pulse text-center w-max">
-                    Tap map OR drag marker to set {editMode === 'tee' ? 'Tee Box' : 'Green'}
+                    Tap map OR drag marker to set Point
                 </div>
             )}
         </div>
@@ -475,39 +546,54 @@ const CourseEditor = () => {
             </div>
 
             {/* Content: Points Setup */}
-            <div className="p-2 grid grid-cols-2 gap-2">
-                {/* Tee Section */}
-                <div className={`rounded-xl border px-3 py-2 flex flex-col gap-1 transition-colors ${hasTee ? 'border-green-500/30 bg-green-900/10' : 'border-gray-700 bg-gray-800/30'}`}>
+            <div className="p-2 grid grid-cols-12 gap-2">
+                {/* Tee Section - Takes 4 cols */}
+                <div className={`col-span-4 rounded-xl border px-2 py-2 flex flex-col gap-1 transition-colors ${hasTee ? 'border-green-500/30 bg-green-900/10' : 'border-gray-700 bg-gray-800/30'}`}>
                     <div className="flex justify-between items-center mb-1">
-                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tee Box</span>
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tee</span>
                         {hasTee ? <Check size={12} className="text-green-500" /> : <div className="w-3 h-3 rounded-full border border-gray-600"></div>}
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-1 h-full">
                         <button onClick={() => setEditMode('tee')} 
-                            className={`flex-1 py-2 rounded-lg text-xs font-bold flex justify-center items-center gap-1.5 transition-all ${editMode === 'tee' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50 scale-105 ring-1 ring-blue-400' : 'bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-700'}`}>
-                            <MapPin size={12} /> Map
+                            className={`flex-1 rounded-lg text-xs font-bold flex justify-center items-center transition-all ${editMode === 'tee' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-300'}`}>
+                            <MapPin size={12} />
                         </button>
                         <button onClick={() => { setEditMode('tee'); useGPSForPoint(); }} 
-                            className="flex-1 bg-gray-800 hover:bg-gray-700 border border-gray-700 py-2 rounded-lg text-xs font-bold flex justify-center items-center gap-1.5 text-gray-300 transition-colors">
-                            <Target size={12} /> GPS
+                            className="flex-1 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg text-xs font-bold flex justify-center items-center text-gray-300">
+                            <Target size={12} />
                         </button>
                     </div>
                 </div>
 
-                {/* Green Section */}
-                <div className={`rounded-xl border px-3 py-2 flex flex-col gap-1 transition-colors ${hasGreen ? 'border-green-500/30 bg-green-900/10' : 'border-gray-700 bg-gray-800/30'}`}>
+                {/* Green Section - Takes 8 cols */}
+                <div className={`col-span-8 rounded-xl border px-2 py-2 flex flex-col gap-1 transition-colors ${hasGreen ? 'border-green-500/30 bg-green-900/10' : 'border-gray-700 bg-gray-800/30'}`}>
                     <div className="flex justify-between items-center mb-1">
-                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Green</span>
-                        {hasGreen ? <Check size={12} className="text-green-500" /> : <div className="w-3 h-3 rounded-full border border-gray-600"></div>}
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Green Points</span>
+                        <div className="flex gap-1">
+                            {['center', 'front', 'back'].map((m) => {
+                                const modeKey = m as 'center'|'front'|'back';
+                                const isSet = m === 'center' ? hasGreen : (m === 'front' ? !!currentHole.greenFront : !!currentHole.greenBack);
+                                return (
+                                    <span key={m} className={`text-[8px] px-1 rounded uppercase font-bold ${isSet ? 'bg-green-900 text-green-400' : 'bg-gray-800 text-gray-500'}`}>{m.charAt(0)}</span>
+                                )
+                            })}
+                        </div>
                     </div>
-                     <div className="flex gap-2">
-                        <button onClick={() => setEditMode('green')} 
-                            className={`flex-1 py-2 rounded-lg text-xs font-bold flex justify-center items-center gap-1.5 transition-all ${editMode === 'green' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50 scale-105 ring-1 ring-blue-400' : 'bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-700'}`}>
-                            <MapPin size={12} /> Map
+                     <div className="flex gap-1">
+                        <button onClick={() => setGreenMode('center')} className={`flex-1 py-2 rounded-lg flex items-center justify-center ${greenSubMode === 'center' ? 'bg-green-600 text-white' : 'bg-gray-800 text-gray-400'}`}>
+                            <MapPin size={14} />
                         </button>
-                        <button onClick={() => { setEditMode('green'); useGPSForPoint(); }} 
-                            className="flex-1 bg-gray-800 hover:bg-gray-700 border border-gray-700 py-2 rounded-lg text-xs font-bold flex justify-center items-center gap-1.5 text-gray-300 transition-colors">
-                            <Target size={12} /> GPS
+                        <button onClick={() => setGreenMode('front')} className={`flex-1 py-2 rounded-lg flex items-center justify-center ${greenSubMode === 'front' ? 'bg-green-600 text-white' : 'bg-gray-800 text-gray-400'}`}>
+                            <ArrowDownToLine size={14} />
+                        </button>
+                        <button onClick={() => setGreenMode('back')} className={`flex-1 py-2 rounded-lg flex items-center justify-center ${greenSubMode === 'back' ? 'bg-green-600 text-white' : 'bg-gray-800 text-gray-400'}`}>
+                            <ArrowUpToLine size={14} />
+                        </button>
+                        <button onClick={() => setGreenMode('left')} className={`flex-1 py-2 rounded-lg flex items-center justify-center ${greenSubMode === 'left' ? 'bg-green-600 text-white' : 'bg-gray-800 text-gray-400'}`}>
+                            <ArrowLeftToLine size={14} />
+                        </button>
+                        <button onClick={() => setGreenMode('right')} className={`flex-1 py-2 rounded-lg flex items-center justify-center ${greenSubMode === 'right' ? 'bg-green-600 text-white' : 'bg-gray-800 text-gray-400'}`}>
+                            <ArrowRightToLine size={14} />
                         </button>
                     </div>
                 </div>

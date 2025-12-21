@@ -1,10 +1,23 @@
 
 # PinSeeker Web - Development Log
 
-## Version: V7.17.1 (Annotation Tools Repair)
+## Version: V7.18.0 (Advanced Stats & GPS Tee)
 **Date:** 2024-06-06
 **Branch:** `main`
 **Status:** ✅ CURRENT
+
+### Features & Fixes
+- **GPS Tee-Off**: Added long-press (3s) functionality to the "TEE OFF" button. Users can now reset the hole starting point to their current GPS location (e.g., if playing from a different tee box or a specific practice spot).
+- **Advanced Analytics**: Completely overhauled the `RoundSummary` page.
+  - Added Front 9 / Back 9 / Total split analysis table.
+  - Added a traditional horizontal Scorecard Grid view for detailed hole-by-hole review.
+  - Added detailed stats including "Average Putts" and "GIR %".
+- **Smart Course Data**: Implemented a fallback algorithm for Green Front/Back coordinates. If a course lacks specific edge data, the app now automatically calculates virtual Front/Back points based on the hole orientation and a standard 15-yard radius.
+
+## Version: V7.17.1 (Annotation Tools Repair)
+**Date:** 2024-06-06
+**Branch:** `main`
+**Status:** ✅ ARCHIVED
 
 ### Features & Fixes
 - **Annotation Mode Fixed**: Restored the missing toolbar for Text, Pin, Drawing, and Eraser tools in `PlayRound`.
@@ -45,8 +58,3 @@
 - **UI/UX**: 
   - Added HDCP input modal.
   - Added club synchronization confirmation dialog.
-
-## Version: V7.15.0 (Stable Milestone - Refactored)
-**Date:** 2024-06-05
-**Branch:** `main`
-**Status:** ✅ ARCHIVED

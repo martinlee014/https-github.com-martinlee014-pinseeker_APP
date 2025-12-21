@@ -15,7 +15,11 @@ export interface GolfHole {
   number: number;
   par: number;
   tee: LatLng;
-  green: LatLng;
+  green: LatLng; // Center of the green
+  greenFront?: LatLng;
+  greenBack?: LatLng;
+  greenLeft?: LatLng;
+  greenRight?: LatLng;
 }
 
 export interface GolfCourse {

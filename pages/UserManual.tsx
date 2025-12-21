@@ -1,3 +1,4 @@
+
 import { ChevronLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -53,6 +54,26 @@ const UserManual = () => {
         />
 
         <Section 
+          title="Recording Shots & GPS"
+          items={[
+            '**Record Shot:** Walk to your ball and tap the GPS button (bottom right) to save the shot landing spot.',
+            '**Smart Tee-Off:** Long-press the "TEE OFF" button (3s) to start the hole from your exact current GPS location (useful if playing from a different tee box).',
+            '**Manual Drop:** Long-press anywhere on the map to manually drop your ball location without GPS.',
+            '**Undo:** Long-press any yellow shot marker on the map during a round to delete that shot.'
+          ]}
+        />
+
+        <Section 
+          title="Round Analysis & Statistics"
+          items={[
+            '**Split Stats:** View performance broken down by Front 9, Back 9, and Total.',
+            '**Traditional Card:** Switch to the "Detailed Scorecard" tab for a classic grid view of Par, Score, and Putts.',
+            '**Advanced Metrics:** Analyze Greens in Regulation (GIR), Average Putts, and Scrambling efficiency.',
+            '**Hole Review:** Tap any hole row in the overview to replay shots from that specific hole.'
+          ]}
+        />
+
+        <Section 
           title="Annotation Tools"
           items={[
             'Tap the Pen icon (top right) to toggle Annotation Mode.',
@@ -68,16 +89,6 @@ const UserManual = () => {
              'Tap the Wind icon to open the compass overlay.',
              'Drag the ring to align the arrow with the current wind direction.',
              'The map will automatically adjust your predicted landing spot based on headwind or crosswind components.'
-          ]}
-        />
-
-        <Section 
-          title="Recording Shots & GPS"
-          items={[
-            '**Record Shot:** Walk to your ball and tap the GPS button (bottom right) to save the shot landing spot.',
-            '**Move Tee Box:** Long-press (>1 sec) the GPS button to update the *start* position (Tee) to your current location.',
-            '**Manual Drop:** Long-press anywhere on the map to manually drop your ball location without GPS.',
-            '**Undo:** Long-press any yellow shot marker on the map during a round to delete that shot.'
           ]}
         />
 
