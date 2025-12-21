@@ -61,6 +61,12 @@
       /* Leaflet specific fix for vectors */
       .leaflet-overlay-pane svg {
           -webkit-touch-callout: none !important;
+          pointer-events: none !important; /* FIXED: Allow clicks to pass through the SVG container */
+      }
+      
+      /* Re-enable pointer events for interactive paths inside the SVG */
+      .leaflet-interactive {
+          pointer-events: auto !important;
       }
 
       /* Helper class for click-through map overlays */

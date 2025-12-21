@@ -120,7 +120,7 @@ const userLocationIcon = new L.DivIcon({
 });
 
 const createArrowIcon = (rotation: number) => new L.DivIcon({
-  className: 'bg-transparent',
+  className: 'bg-transparent pointer-events-none',
   html: `
     <div style="
       transform: rotate(${rotation}deg); 
@@ -139,7 +139,7 @@ const createArrowIcon = (rotation: number) => new L.DivIcon({
 });
 
 const createReplayLabelIcon = (text: string, rotation: number) => new L.DivIcon({
-  className: 'custom-label-icon',
+  className: 'custom-label-icon pointer-events-none',
   html: `
     <div style='
       transform: rotate(${rotation}deg); 
@@ -161,7 +161,7 @@ const createReplayLabelIcon = (text: string, rotation: number) => new L.DivIcon(
 });
 
 const createDistanceLabelIcon = (text: string, rotation: number, color: string = '#ffffff') => new L.DivIcon({
-  className: 'custom-label-icon',
+  className: 'custom-label-icon pointer-events-none',
   html: `
     <div style='
       transform: rotate(${rotation}deg); 
