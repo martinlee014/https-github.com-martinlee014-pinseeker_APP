@@ -227,7 +227,7 @@ const GolfBagIcon = ({ size = 24, className = "" }: { size?: number, className?:
     strokeLinejoin="round" 
     className={className}
   >
-    <path d="M7 6h10v14a2 2 0 0 1-2 2H9a2 2 0 0 1-2 2H9a2 2 0 0 1-2 2H9a2 2 0 0 1-2 2H9a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V6z" />
+    <path d="M7 6h10v14a2 2 0 0 1-2 2H9a2 2 0 0 1-2 2H9a2 2 0 0 1-2 2H9a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V6z" />
     <path d="M9 6V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3" />
     <path d="M9 4l-2 2" />
     <path d="M15 4l2 2" />
@@ -1246,22 +1246,18 @@ const PlayRound = () => {
 
       {/* Replay Controls */}
       {isReplay && (
-        <div className="absolute bottom-0 w-full z-30 pt-2 px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] flex justify-between items-center bg-gradient-to-t from-black/90 via-black/60 to-transparent">
+        <div className="absolute bottom-0 w-full z-30 pt-2 px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] flex justify-between items-center bg-gradient-to-t from-black/90 via-black/60 to-transparent pointer-events-none">
             <button 
                 onClick={() => loadHole(Math.max(0, currentHoleIdx - 1))}
                 disabled={currentHoleIdx === 0}
-                className="bg-gray-800/80 p-4 rounded-2xl text-white disabled:opacity-20 flex items-center gap-2 border border-white/5 active:scale-95 transition-all shadow-xl"
+                className="pointer-events-auto bg-gray-800/80 p-4 rounded-2xl text-white disabled:opacity-20 flex items-center gap-2 border border-white/5 active:scale-95 transition-all shadow-xl"
             >
                 <ArrowLeft size={20}/> <span className="font-bold text-xs uppercase tracking-widest">Prev</span>
             </button>
-            <div className="text-center px-4 py-2 rounded-xl bg-black/40 backdrop-blur-md border border-white/5">
-                <div className="text-[9px] text-gray-500 font-black uppercase tracking-[0.2em] mb-0.5">Hole Stats</div>
-                <div className="text-white font-bold text-sm">{holeShots.length} Shots <span className="text-gray-500 mx-1">|</span> Par {hole.par}</div>
-            </div>
             <button 
                 onClick={() => loadHole(Math.min(activeCourse.holes.length - 1, currentHoleIdx + 1))}
                 disabled={currentHoleIdx === activeCourse.holes.length - 1}
-                className="bg-gray-800/80 p-4 rounded-2xl text-white disabled:opacity-20 flex items-center gap-2 border border-white/5 active:scale-95 transition-all shadow-xl"
+                className="pointer-events-auto bg-gray-800/80 p-4 rounded-2xl text-white disabled:opacity-20 flex items-center gap-2 border border-white/5 active:scale-95 transition-all shadow-xl"
             >
                 <span className="font-bold text-xs uppercase tracking-widest">Next</span> <ArrowRight size={20}/>
             </button>
