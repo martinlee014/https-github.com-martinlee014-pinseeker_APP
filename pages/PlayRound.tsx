@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useContext, useMemo, useRef, Fragment } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Polyline, Polygon, useMap } from 'react-leaflet';
@@ -9,7 +10,7 @@ import * as MathUtils from '../services/mathUtils';
 import { ClubStats, HoleScore, ShotRecord, RoundHistory, LatLng, GolfCourse, MapAnnotation } from '../types';
 import ClubSelector from '../components/ClubSelector';
 import { ScoreModal, ShotConfirmModal, HoleSelectorModal, FullScorecardModal, ModalOverlay } from '../components/Modals';
-import { Flag, Wind, ChevronLeft, Grid, ListChecks, ArrowLeft, ArrowRight, ChevronDown, MapPin, Ruler, Trash2, PenTool, Type, Highlighter, X, Check, Eraser, Home, Signal, SignalHigh, SignalLow, SignalMedium, Footprints, PlayCircle, RotateCcw, Rocket, Satellite, Menu, MoreVertical, LayoutGrid } from 'lucide-react';
+import { Flag, Wind, ChevronLeft, Grid, ListChecks, ArrowLeft, ArrowRight, ChevronDown, MapPin, Ruler, Trash2, PenTool, Type, Highlighter, X, Check, Eraser, Home, Signal, SignalHigh, SignalLow, SignalMedium, Footprints, PlayCircle, RotateCcw, Rocket, Satellite, Menu, MoreVertical, LayoutGrid, Loader2 } from 'lucide-react';
 
 // --- Icons Setup ---
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -468,6 +469,8 @@ const PlayRound = () => {
   const [liveLocation, setLiveLocation] = useState<LatLng | null>(null);
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
   const [gpsSignalLevel, setGpsSignalLevel] = useState<0 | 1 | 2 | 3>(0);
+  const [isSaving, setIsSaving] = useState(false);
+
   const watchIdRef = useRef<number | null>(null);
   
   // Menu State for collapsing icons
@@ -791,7 +794,16 @@ const PlayRound = () => {
   };
 
   const saveHoleScore = (totalScore: number, putts: number, pens: number) => {
-    const newScore = { holeNumber: hole.number, par: hole.par, shotsTaken: Math.max(0, totalScore - putts - pens), putts, penalties: pens };
+    if (isSaving) return;
+    setIsSaving(true);
+
+    const newScore = { 
+        holeNumber: hole.number, 
+        par: Number(hole.par), // Ensure par is always a number
+        shotsTaken: Math.max(0, totalScore - putts - pens), 
+        putts, 
+        penalties: pens 
+    };
     
     // Explicitly create the updated scorecard array to ensure finishRound gets the latest data
     const updatedScorecard = [...scorecard.filter(s => s.holeNumber !== hole.number), newScore];
@@ -799,8 +811,10 @@ const PlayRound = () => {
     setScorecard(updatedScorecard);
     setShowScoreModal(false);
     
+    // Check if this is the last hole in the array
     if (currentHoleIdx < activeCourse.holes.length - 1) {
         loadHole(currentHoleIdx + 1);
+        setIsSaving(false);
     } else {
         finishRound(updatedScorecard);
     }
@@ -1048,7 +1062,7 @@ const PlayRound = () => {
                     onClick={() => setShowScoreModal(true)} 
                     className="w-11 h-11 bg-green-600 hover:bg-green-500 text-white rounded-full flex items-center justify-center shadow-lg shadow-green-900/50 border border-white/20 active:scale-95 transition-transform"
                  >
-                    <Flag fill="currentColor" size={20} />
+                    {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Flag fill="currentColor" size={20} />}
                  </button>
              )}
 

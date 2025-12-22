@@ -18,18 +18,13 @@ const RoundSummary = () => {
     const back9 = round.scorecard.filter(h => h.holeNumber > 9);
 
     const calc = (holes: HoleScore[]) => {
-        const par = holes.reduce((acc, h) => acc + h.par, 0);
-        const shots = holes.reduce((acc, h) => acc + h.shotsTaken, 0); // Raw shots excluding putts/pens usually? No, existing logic combines them often.
-        // Let's stick to the definition: Total Score = Shots + Putts + Penalties
-        // Wait, normally shotsTaken in data entry usually implies "Shots to get on green". 
-        // Let's follow how it was saved: shotsTaken = total - putts - penalties.
-        // So Score = shotsTaken + putts + penalties.
+        const par = holes.reduce((acc, h) => acc + (Number(h.par) || 0), 0);
         
         const putts = holes.reduce((acc, h) => acc + h.putts, 0);
         const penalties = holes.reduce((acc, h) => acc + h.penalties, 0);
         const score = holes.reduce((acc, h) => acc + h.shotsTaken + h.putts + h.penalties, 0);
         
-        const gir = holes.filter(h => (h.shotsTaken) <= (h.par - 2)).length;
+        const gir = holes.filter(h => (h.shotsTaken) <= ((Number(h.par) || 4) - 2)).length;
         
         return { par, score, putts, penalties, gir, count: holes.length };
     };
@@ -123,21 +118,26 @@ const RoundSummary = () => {
                     {displayHoles.map(h => (
                         <div key={h.holeNumber} className="flex-1 p-2 text-center text-xs text-gray-400 border-r border-gray-800 last:border-0">{h.par}</div>
                     ))}
-                    <div className="w-12 p-2 text-center text-xs font-bold text-gray-400 bg-gray-800/30">{typeof statsObj.par === 'number' && statsObj.count > 0 ? statsObj.par : '-'}</div>
+                    <div className="w-12 p-2 text-center text-xs font-bold text-gray-400 bg-gray-800/30">{statsObj.count > 0 ? statsObj.par : '-'}</div>
                 </div>
                 {/* Score Row */}
                 <div className="flex bg-gray-900 border-b border-gray-800">
                     <div className="w-12 p-2 text-[10px] text-gray-500 font-bold border-r border-gray-800">Score</div>
                     {displayHoles.map(h => {
-                        const score = typeof h.par === 'number' ? h.shotsTaken + h.putts + h.penalties : 0;
+                        // More robust score check: if shotsTaken > 0, we calculate score, regardless of par type validity (though par is needed for color)
+                        const rawScore = h.shotsTaken + h.putts + h.penalties;
+                        const parVal = Number(h.par);
+                        const hasPar = !isNaN(parVal) && parVal > 0;
+                        const score = rawScore > 0 ? rawScore : 0;
+                        
                         let color = 'text-white';
-                        if (score > 0 && typeof h.par === 'number') {
-                            if (score < h.par) color = 'text-red-400 font-black'; // Birdie or better
-                            else if (score > h.par) color = 'text-blue-400'; // Bogey or worse
+                        if (score > 0 && hasPar) {
+                            if (score < parVal) color = 'text-red-400 font-black'; // Birdie or better
+                            else if (score > parVal) color = 'text-blue-400'; // Bogey or worse
                         }
                         return (
                             <div key={h.holeNumber} className={`flex-1 p-2 text-center text-sm font-bold border-r border-gray-800 last:border-0 ${color}`}>
-                                {typeof h.par === 'number' && score > 0 ? score : '-'}
+                                {score > 0 ? score : '-'}
                             </div>
                         );
                     })}
@@ -148,7 +148,7 @@ const RoundSummary = () => {
                     <div className="w-12 p-2 text-[10px] text-gray-500 font-bold border-r border-gray-800">Putts</div>
                     {displayHoles.map(h => (
                         <div key={h.holeNumber} className="flex-1 p-2 text-center text-xs text-orange-300 border-r border-gray-800 last:border-0">
-                             {typeof h.par === 'number' && h.putts > 0 ? h.putts : '-'}
+                             {h.putts > 0 || (h.shotsTaken > 0) ? h.putts : '-'}
                         </div>
                     ))}
                     <div className="w-12 p-2 text-center text-xs font-bold text-orange-400 bg-gray-800/30">{statsObj.count > 0 ? statsObj.putts : '-'}</div>
@@ -282,10 +282,14 @@ const RoundSummary = () => {
                     <div className="space-y-2">
                         {round.scorecard.map((h, i) => {
                              const score = h.shotsTaken + h.putts + h.penalties;
+                             const parVal = Number(h.par);
                              let badgeColor = "border-gray-700 text-gray-400";
-                             if (score < h.par) badgeColor = "border-red-500/50 text-red-400 bg-red-900/10";
-                             else if (score > h.par) badgeColor = "border-blue-500/50 text-blue-400 bg-blue-900/10";
-                             else badgeColor = "border-green-500/50 text-green-400 bg-green-900/10";
+                             
+                             if (!isNaN(parVal)) {
+                                 if (score < parVal) badgeColor = "border-red-500/50 text-red-400 bg-red-900/10";
+                                 else if (score > parVal) badgeColor = "border-blue-500/50 text-blue-400 bg-blue-900/10";
+                                 else badgeColor = "border-green-500/50 text-green-400 bg-green-900/10";
+                             }
 
                             return (
                                 <div key={h.holeNumber} onClick={() => navigate('/play', { state: { round, initialHoleIndex: i } })} className="bg-gray-800/50 p-3 rounded-xl border border-gray-700 flex items-center justify-between cursor-pointer active:scale-[0.99] transition-transform">
@@ -299,7 +303,7 @@ const RoundSummary = () => {
                                         </div>
                                     </div>
                                     <div className="text-right">
-                                        <div className={`text-lg font-black ${score < h.par ? 'text-red-400' : score > h.par ? 'text-blue-400' : 'text-white'}`}>{score}</div>
+                                        <div className={`text-lg font-black ${!isNaN(parVal) && score < parVal ? 'text-red-400' : !isNaN(parVal) && score > parVal ? 'text-blue-400' : 'text-white'}`}>{score}</div>
                                     </div>
                                 </div>
                             );
