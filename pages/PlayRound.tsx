@@ -450,11 +450,53 @@ const PlayRound = () => {
 
   const isReplay = !!replayRound;
 
-  const [activeCourse, setActiveCourse] = useState<GolfCourse>(passedCourse || DUVENHOF_COURSE);
+  // Initialize activeCourse synchronously from storage if it's a replay of a custom course
+  const [activeCourse, setActiveCourse] = useState<GolfCourse>(() => {
+      if (passedCourse) return passedCourse;
+      
+      // If Replay, resolve course by name
+      if (isReplay && replayRound) {
+          const allCourses = StorageService.getAllCourses();
+          const found = allCourses.find(c => c.name === replayRound.courseName);
+          return found || DUVENHOF_COURSE;
+      }
+      
+      // If restoring active game, resolve by ID
+      if (!isReplay && user) {
+          const searchParams = new URLSearchParams(location.search);
+          if (searchParams.get('restore') === 'true') {
+             const saved = StorageService.getTempState(user);
+             if (saved && saved.courseId) {
+                 const allCourses = StorageService.getAllCourses();
+                 const found = allCourses.find(c => c.id === saved.courseId);
+                 if (found) return found;
+             }
+          }
+      }
+      
+      return DUVENHOF_COURSE;
+  });
+
   const [currentHoleIdx, setCurrentHoleIdx] = useState(initialHoleIdx);
   const [shots, setShots] = useState<ShotRecord[]>([]);
   const [scorecard, setScorecard] = useState<HoleScore[]>([]);
-  const [currentBallPos, setCurrentBallPos] = useState<LatLng>({ lat: 0, lng: 0 });
+  
+  // Initialize currentBallPos safely based on the RESOLVED activeCourse
+  const [currentBallPos, setCurrentBallPos] = useState<LatLng>(() => {
+      // 1. Try restore from temp state
+      if (!isReplay && user) {
+          const searchParams = new URLSearchParams(location.search);
+          if (searchParams.get('restore') === 'true') {
+              const saved = StorageService.getTempState(user);
+              if (saved && saved.currentBallPos) return saved.currentBallPos;
+          }
+      }
+      
+      // 2. Default to tee of the ACTIVE course (which is now correctly resolved above)
+      const h = activeCourse.holes[initialHoleIdx];
+      return h ? h.tee : { lat: 0, lng: 0 };
+  });
+
   const [selectedClub, setSelectedClub] = useState<ClubStats>(bag[0] || { name: 'Driver', carry: 230, sideError: 45, depthError: 25 });
   const [aimAngle, setAimAngle] = useState(0);
   const [shotNum, setShotNum] = useState(1);
@@ -503,29 +545,23 @@ const PlayRound = () => {
   }, [isTrackingMode, trackingStartPos, liveLocation]);
 
   useEffect(() => {
-    if (passedCourse) setActiveCourse(passedCourse);
+    // We already resolved activeCourse in useState, so we only need to load shot data here
     if (isReplay && replayRound) {
         setShots(replayRound.shots);
         setScorecard(replayRound.scorecard);
-        const h = activeCourse.holes[initialHoleIdx];
-        if (h) setCurrentBallPos(h.tee);
     } else {
         const searchParams = new URLSearchParams(location.search);
         if (searchParams.get('restore') === 'true' && user) {
             const saved = StorageService.getTempState(user);
             if (saved) {
-                if (saved.courseId) {
-                   const allCourses = StorageService.getAllCourses();
-                   const savedCourse = allCourses.find(c => c.id === saved.courseId);
-                   if (savedCourse) setActiveCourse(savedCourse);
-                }
+                // Course ID was handled in useState
                 setCurrentHoleIdx(saved.currentHoleIndex);
                 setShots(saved.shots);
                 setScorecard(saved.scorecard);
                 setShotNum(saved.currentShotNum);
-                setCurrentBallPos(saved.currentBallPos);
-            } else if (hole) setCurrentBallPos(hole.tee);
-        } else if (hole) setCurrentBallPos(hole.tee);
+                // currentBallPos was handled in useState
+            }
+        }
     }
   }, []);
 
