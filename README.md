@@ -49,8 +49,8 @@ git init
 # 2. Add all files to the staging area
 git add .
 
-# 3. Commit the changes (Version 7.18.2)
-git commit -m "feat: redesign hud to vertical stack with larger fonts v7.18.2"
+# 3. Commit the changes (Version 7.18.3)
+git commit -m "fix: replay mode custom course loading and map zoom issues v7.18.3"
 
 # 4. Ensure you are on the main branch
 git branch -M main

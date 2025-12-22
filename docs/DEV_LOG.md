@@ -1,10 +1,19 @@
 
 # PinSeeker Web - Development Log
 
-## Version: V7.18.2 (HUD Redesign & Visual Optimization)
+## Version: V7.18.3 (Replay Mode Stability)
 **Date:** 2024-06-06
 **Branch:** `main`
 **Status:** ✅ CURRENT
+
+### Features & Fixes
+- **Replay Course Loading**: Fixed a critical bug where replaying a custom course would incorrectly default to the built-in Duvenhof course. Implemented synchronous state initialization to resolve course data immediately before render.
+- **Map Zoom Fix**: Fixed an issue where the map would zoom out to a global view (showing Africa/Atlantic Ocean) during replay due to invalid (0,0) coordinates in the shot history. Added strict filtering for coordinate bounds calculation.
+
+## Version: V7.18.2 (HUD Redesign & Visual Optimization)
+**Date:** 2024-06-06
+**Branch:** `main`
+**Status:** ✅ ARCHIVED
 
 ### Features & Fixes
 - **HUD Redesign**: Completely refactored the Top-Left Distance display in `PlayRound`.
@@ -80,3 +89,8 @@
 - **UI/UX**: 
   - Added HDCP input modal.
   - Added club synchronization confirmation dialog.
+
+## Version: V7.15.0 (Stable Milestone - Refactored)
+**Date:** 2024-06-05
+**Branch:** `main`
+**Status:** ✅ ARCHIVED
