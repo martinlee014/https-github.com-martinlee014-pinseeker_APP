@@ -227,7 +227,7 @@ const GolfBagIcon = ({ size = 24, className = "" }: { size?: number, className?:
     strokeLinejoin="round" 
     className={className}
   >
-    <path d="M7 6h10v14a2 2 0 0 1-2 2H9a2 2 0 0 1-2 2H9a2 2 0 0 1-2 2H9a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V6z" />
+    <path d="M7 6h10v14a2 2 0 0 1-2 2H9a2 2 0 0 1-2 2H9a2 2 0 0 1-2 2H9a2 2 0 0 1-2 2H9a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V6z" />
     <path d="M9 6V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3" />
     <path d="M9 4l-2 2" />
     <path d="M15 4l2 2" />
@@ -1055,13 +1055,12 @@ const PlayRound = () => {
 
       {/* REPLAY HUD (Top Left) */}
       {isReplay && (
-          <div className="absolute top-4 left-4 z-[900] flex flex-col gap-3 pointer-events-none animate-in slide-in-from-left-4 fade-in duration-300">
+          <div className="absolute top-4 left-4 z-[900] flex flex-col gap-2 pointer-events-none animate-in slide-in-from-left-4 fade-in duration-300">
               <button 
                   onClick={() => navigate('/summary', { state: { round: replayRound } })}
-                  className="pointer-events-auto self-start bg-black/60 hover:bg-black/80 backdrop-blur-md text-white pl-3 pr-4 py-2 rounded-full border border-white/10 flex items-center gap-1 shadow-lg transition-all group"
+                  className="pointer-events-auto self-start bg-black/40 hover:bg-black/60 backdrop-blur-md text-white w-9 h-9 rounded-full border border-white/10 flex items-center justify-center shadow-lg transition-all active:scale-95"
               >
-                  <ChevronLeft size={16} className="text-gray-400 group-hover:text-white transition-colors" />
-                  <span className="text-xs font-bold uppercase tracking-wider">Exit</span>
+                  <ChevronLeft size={20} className="text-white ml-[-1px]" />
               </button>
 
               {/* Hole Score Detail */}
@@ -1076,20 +1075,27 @@ const PlayRound = () => {
                    else if (diff > 0) scoreColor = 'text-blue-400';
 
                    return (
-                       <div className="pointer-events-auto bg-black/80 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl overflow-hidden min-w-[110px]">
-                           <div className="bg-white/5 px-3 py-2 flex items-center justify-between border-b border-white/5">
-                                <span className="text-sm font-black text-white">H{hole.number}</span>
-                                <span className="text-[10px] font-bold text-gray-400">PAR {hole.par}</span>
+                       <div className="pointer-events-auto bg-black/60 backdrop-blur-md rounded-2xl border border-white/10 shadow-xl overflow-hidden min-w-[80px]">
+                           <div className="bg-white/5 px-2.5 py-1.5 flex items-center justify-between border-b border-white/5 gap-2">
+                                <span className="text-xs font-black text-white">H{hole.number}</span>
+                                <span className="text-[10px] font-bold text-gray-400">P{hole.par}</span>
                            </div>
-                           <div className="p-3 text-center">
-                                <div className={`text-4xl font-black leading-none mb-2 ${scoreColor}`}>{total}</div>
-                                <div className="grid grid-cols-2 gap-1 text-[9px] text-gray-400 font-bold uppercase text-left">
-                                    <div>Shot</div><div className="text-right text-gray-200">{hScore.shotsTaken}</div>
-                                    <div>Putt</div><div className="text-right text-gray-200">{hScore.putts}</div>
+                           <div className="px-2 py-2 text-center">
+                                <div className={`text-3xl font-black leading-none mb-1.5 ${scoreColor}`}>{total}</div>
+                                <div className="flex justify-center items-center gap-2 text-[8px] font-bold text-gray-400 uppercase leading-none">
+                                    <div className="flex flex-col items-center gap-0.5">
+                                        <span>Shot</span><span className="text-gray-200 text-[9px]">{hScore.shotsTaken}</span>
+                                    </div>
+                                    <div className="w-[1px] h-4 bg-white/10"></div>
+                                    <div className="flex flex-col items-center gap-0.5">
+                                        <span>Putt</span><span className="text-gray-200 text-[9px]">{hScore.putts}</span>
+                                    </div>
                                     {hScore.penalties > 0 && (
                                         <>
-                                            <div className="text-red-400">Pen</div>
-                                            <div className="text-right text-red-400">{hScore.penalties}</div>
+                                            <div className="w-[1px] h-4 bg-white/10"></div>
+                                            <div className="flex flex-col items-center gap-0.5 text-red-400">
+                                                <span>Pen</span><span className="text-[9px]">{hScore.penalties}</span>
+                                            </div>
                                         </>
                                     )}
                                 </div>
