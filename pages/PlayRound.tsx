@@ -413,17 +413,25 @@ const MapInitializer = ({ center, isReplay, pointsToFit }: { center: LatLng, isR
 
     useEffect(() => {
         if (isReplay && pointsToFit && pointsToFit.length > 0) {
-            let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180;
-            pointsToFit.forEach(p => {
-                if (p.lat < minLat) minLat = p.lat;
-                if (p.lat > maxLat) maxLat = p.lat;
-                if (p.lng < minLng) minLng = p.lng;
-                if (p.lng > maxLng) maxLng = p.lng;
-            });
-            const bounds = L.latLngBounds(L.latLng(minLat, minLng), L.latLng(maxLat, maxLng));
-            map.fitBounds(bounds, { padding: [50, 50], animate: false });
+            // CRITICAL FIX: Filter out invalid (0,0) coordinates which cause the "zoom out to whole world" issue
+            const validPoints = pointsToFit.filter(p => p.lat !== 0 && p.lng !== 0);
+            if (validPoints.length > 0) {
+                let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180;
+                validPoints.forEach(p => {
+                    if (p.lat < minLat) minLat = p.lat;
+                    if (p.lat > maxLat) maxLat = p.lat;
+                    if (p.lng < minLng) minLng = p.lng;
+                    if (p.lng > maxLng) maxLng = p.lng;
+                });
+                const bounds = L.latLngBounds(L.latLng(minLat, minLng), L.latLng(maxLat, maxLng));
+                // Add padding to ensure the UI HUD doesn't block the markers
+                map.fitBounds(bounds, { padding: [80, 80], animate: true, duration: 0.8 });
+            }
         } else {
-            map.setView([center.lat, center.lng], 18, { animate: false });
+            // Default view for active play
+            if (center.lat !== 0) {
+                map.setView([center.lat, center.lng], 18, { animate: false });
+            }
         }
     }, [center, isReplay, map, pointsToFit]);
     return null;
@@ -570,30 +578,22 @@ const PlayRound = () => {
   if (!hole) return <div className="p-10 text-white">Loading Hole Data...</div>;
 
   // -- LOGIC START FOR GREEN POINTS DEFAULTING --
-  // Calculate orientation of the hole (Tee -> Green) to determine Front/Back
   const holeOrientation = useMemo(() => MathUtils.calculateBearing(hole.tee, hole.green), [hole]);
-  
-  // Default radius (15 yards ~ 13.716 meters)
   const defaultRadiusMeters = 13.716;
 
-  // If user hasn't set custom points, calculate defaults based on 15y radius
   const activeGreenFront = useMemo(() => {
       if (hole.greenFront) return hole.greenFront;
-      // Front is "short" of the green center, so bearing + 180 (back towards tee)
       return MathUtils.calculateDestination(hole.green, defaultRadiusMeters, holeOrientation + 180);
   }, [hole, holeOrientation]);
 
   const activeGreenBack = useMemo(() => {
       if (hole.greenBack) return hole.greenBack;
-      // Back is "long" of the green center, so bearing is same as hole orientation
       return MathUtils.calculateDestination(hole.green, defaultRadiusMeters, holeOrientation);
   }, [hole, holeOrientation]);
 
-  // Calculate Distances
   const distToGreen = useMemo(() => MathUtils.calculateDistance(currentBallPos, hole.green), [currentBallPos, hole]);
   const distToFront = useMemo(() => MathUtils.calculateDistance(currentBallPos, activeGreenFront), [currentBallPos, activeGreenFront]);
   const distToBack = useMemo(() => MathUtils.calculateDistance(currentBallPos, activeGreenBack), [currentBallPos, activeGreenBack]);
-  // -- LOGIC END --
 
   const baseBearing = useMemo(() => MathUtils.calculateBearing(currentBallPos, hole.green), [currentBallPos, hole]);
   const shotBearing = baseBearing + aimAngle;
@@ -613,7 +613,13 @@ const PlayRound = () => {
   ).map(p => [p.lat, p.lng] as [number, number]), [predictedLanding, selectedClub, shotBearing]);
 
   const holeShots = useMemo(() => shots.filter(s => s.holeNumber === hole.number), [shots, hole.number]);
-  const replayPoints = useMemo(() => isReplay ? [hole.tee, hole.green, ...holeShots.map(s => s.to)] : [], [isReplay, hole, holeShots]);
+  
+  // Replay Points: filtered to include ONLY valid coordinates (Tee + Green + Shots)
+  const replayPoints = useMemo(() => {
+      if (!isReplay) return [];
+      const pts = [hole.tee, hole.green, ...holeShots.map(s => s.to)];
+      return pts.filter(p => p.lat !== 0 && p.lng !== 0);
+  }, [isReplay, hole, holeShots]);
 
   const guideLinePoints = useMemo(() => [[predictedLanding.lat, predictedLanding.lng], [hole.green.lat, hole.green.lng]], [predictedLanding, hole]);
   const guideLabelPos = useMemo(() => ({
@@ -772,8 +778,6 @@ const PlayRound = () => {
     setShotNum(prev => prev + 1);
     setAimAngle(0);
     setPendingShot(null);
-
-    // Reset tracking if it was active
     setIsTrackingMode(false);
     setTrackingStartPos(null);
   };
@@ -799,19 +803,16 @@ const PlayRound = () => {
 
     const newScore = { 
         holeNumber: hole.number, 
-        par: Number(hole.par), // Ensure par is always a number
+        par: Number(hole.par), 
         shotsTaken: Math.max(0, totalScore - putts - pens), 
         putts, 
         penalties: pens 
     };
     
-    // Explicitly create the updated scorecard array to ensure finishRound gets the latest data
     const updatedScorecard = [...scorecard.filter(s => s.holeNumber !== hole.number), newScore];
-    
     setScorecard(updatedScorecard);
     setShowScoreModal(false);
     
-    // Check if this is the last hole in the array
     if (currentHoleIdx < activeCourse.holes.length - 1) {
         loadHole(currentHoleIdx + 1);
         setIsSaving(false);
@@ -834,11 +835,7 @@ const PlayRound = () => {
 
   const finishRound = (finalScorecard?: HoleScore[]) => {
     if(!user) return;
-    
-    // Use the passed finalScorecard if available (from saveHoleScore immediately finishing),
-    // otherwise fallback to state (e.g. manual finish from menu)
     const cardToSave = finalScorecard || scorecard;
-    
     const history = { id: crypto.randomUUID(), date: new Date().toLocaleString(), courseName: activeCourse.name, scorecard: cardToSave, shots };
     StorageService.saveHistory(user, history);
     StorageService.clearTempState(user);
@@ -878,7 +875,7 @@ const PlayRound = () => {
         } else {
             alert("Waiting for GPS...");
         }
-        teePressTimer.current = null; // Mark as consumed
+        teePressTimer.current = null;
         setIsTeePressing(false);
     }, 3000);
   };
@@ -1009,7 +1006,6 @@ const PlayRound = () => {
       {!isReplay && !isMeasureMode && (
           <div className="absolute top-4 left-4 z-[900] pointer-events-none animate-in slide-in-from-left-4 duration-300">
                <div className="pointer-events-auto bg-black/80 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl overflow-hidden min-w-[90px] flex flex-col">
-                   {/* Header Row: Compact */}
                    <div className="flex items-center justify-between px-2 py-1.5 border-b border-white/10 bg-white/5 gap-2">
                        <button onClick={() => navigate(-1)} className="text-gray-500 hover:text-white transition-colors">
                            <ChevronLeft size={14} />
@@ -1023,25 +1019,18 @@ const PlayRound = () => {
                        </div>
                    </div>
 
-                   {/* Vertical Distances Stack (Back -> Pin -> Front) */}
                    <div className="py-2 text-center flex flex-col items-center justify-center gap-0.5">
-                        {/* Back */}
                         <div className="text-lg font-bold text-gray-400 leading-none">
                             {Math.round(useYards ? distToBack * 1.09361 : distToBack)}
                         </div>
-                        
-                        {/* Pin (Big) */}
                         <div className="text-5xl font-black text-white leading-none tracking-tighter drop-shadow-md my-0.5">
                             {MathUtils.formatDistance(distToGreen, useYards).replace(/[^0-9]/g, '')}
                         </div>
-                        
-                        {/* Front */}
                         <div className="text-lg font-bold text-gray-400 leading-none">
                             {Math.round(useYards ? distToFront * 1.09361 : distToFront)}
                         </div>
                    </div>
 
-                   {/* Plays Like Footer (Conditional) */}
                    {windSpeed > 0 && (
                         <div className="border-t border-blue-500/20 bg-blue-900/10 py-1 text-center px-1">
                             <div className="text-[8px] font-bold text-blue-300 leading-none">
@@ -1063,7 +1052,6 @@ const PlayRound = () => {
                   <ChevronLeft size={20} className="text-white ml-[-1px]" />
               </button>
 
-              {/* Hole Score Detail */}
               {(() => {
                    const hScore = scorecard.find(h => h.holeNumber === hole.number);
                    if (!hScore) return null;
@@ -1109,7 +1097,6 @@ const PlayRound = () => {
       {/* TOP RIGHT: TOOLS & MENU */}
       <div className="absolute top-0 right-0 p-4 z-[1000] pointer-events-none flex flex-col gap-3 items-end">
           <div className="pointer-events-auto flex flex-col gap-3 items-end">
-             {/* FINISH HOLE (Flag) - Topmost Priority */}
              {!isReplay && !isMeasureMode && !isTrackingMode && (
                  <button 
                     onClick={() => setShowScoreModal(true)} 
@@ -1119,14 +1106,12 @@ const PlayRound = () => {
                  </button>
              )}
 
-             {/* Menu Toggle */}
              {!isReplay && (
                  <button onClick={toggleMenu} className={`w-11 h-11 rounded-full flex items-center justify-center border shadow-lg transition-all active:scale-95 ${isMenuOpen ? 'bg-white text-black border-white' : 'bg-black/80 text-white border-white/10 backdrop-blur-md'}`}>
                     {isMenuOpen ? <X size={20} /> : <Menu size={20} />}
                  </button>
              )}
 
-             {/* Collapsible Menu Items */}
              {isMenuOpen && !isReplay && (
                  <div className="flex flex-col gap-3 animate-in slide-in-from-top-4 fade-in duration-200 items-end">
                      <button onClick={() => navigate('/settings/clubs', { state: { fromGame: true } })} className="flex items-center gap-2 bg-black/80 text-white px-4 py-2.5 rounded-full border border-white/10 shadow-xl backdrop-blur-md hover:bg-black transition-colors">
@@ -1152,7 +1137,6 @@ const PlayRound = () => {
                  </div>
              )}
 
-             {/* Primary Tools (Always Visible below menu) */}
              <button onClick={() => setShowWind(!showWind)} className={`w-11 h-11 rounded-full flex items-center justify-center border shadow-lg transition-all active:scale-95 ${showWind ? 'bg-blue-600 text-white border-blue-400' : 'bg-black/60 text-gray-300 border-white/5 backdrop-blur-md'}`}>
                 <Wind size={20} />
              </button>
@@ -1162,7 +1146,6 @@ const PlayRound = () => {
           </div>
       </div>
 
-      {/* MEASURE MODE OVERLAY (Replaces Top HUD when active) */}
       {isMeasureMode && (
          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] pointer-events-auto bg-blue-600/90 backdrop-blur-xl px-6 py-3 rounded-2xl border border-blue-400/50 shadow-2xl text-center animate-in slide-in-from-top-4 w-64">
               <div className="flex items-center justify-between gap-4 text-white">
@@ -1187,7 +1170,6 @@ const PlayRound = () => {
          </div>
       )}
 
-      {/* Wind Overlay */}
       {showWind && (
           <div className="absolute top-20 right-16 z-[1000] bg-black/90 backdrop-blur-xl p-4 rounded-2xl border border-gray-700 w-48 text-gray-300 shadow-2xl flex flex-col gap-4 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
              <div className="flex items-center justify-between border-b border-gray-800 pb-2">
@@ -1205,7 +1187,6 @@ const PlayRound = () => {
                      </div>
                  </div>
                  <div className="absolute top-1/2 left-1/2 w-3 h-3 bg-gray-400 rounded-full -translate-x-1/2 -translate-y-1/2 shadow-lg z-10"></div>
-                 {/* Compass labels */}
                  <span className="absolute top-1 left-1/2 -translate-x-1/2 text-[8px] text-gray-500 font-bold">N</span>
                  <span className="absolute bottom-1 left-1/2 -translate-x-1/2 text-[8px] text-gray-500 font-bold">S</span>
                  <span className="absolute left-1 top-1/2 -translate-y-1/2 text-[8px] text-gray-500 font-bold">W</span>
@@ -1214,7 +1195,6 @@ const PlayRound = () => {
           </div>
       )}
 
-      {/* Note Tools Overlay (Bottom) */}
       {!isReplay && isNoteMode && (
           <div className="absolute bottom-0 w-full z-30 pt-2 px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] bg-black/80 backdrop-blur-md border-t border-white/10 animate-in slide-in-from-bottom-10">
               <div className="flex justify-between items-center mb-2">
@@ -1244,7 +1224,6 @@ const PlayRound = () => {
           </div>
       )}
 
-      {/* Replay Controls */}
       {isReplay && (
         <div className="absolute bottom-0 w-full z-30 pt-2 px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] flex justify-between items-center bg-gradient-to-t from-black/90 via-black/60 to-transparent pointer-events-none">
             <button 
@@ -1264,7 +1243,6 @@ const PlayRound = () => {
         </div>
       )}
 
-      {/* Main Game Controls (Bottom) */}
       {!isReplay && !isNoteMode && (
         <div className="absolute bottom-0 w-full z-30 pt-2 px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] bg-gradient-to-t from-black/95 via-black/80 to-transparent pointer-events-none">
             {isTrackingMode ? (
@@ -1284,7 +1262,6 @@ const PlayRound = () => {
                     </button>
                  </div>
             ) : isMeasureMode ? (
-                 // Empty space because measure overlay is at top now
                  <div className="h-4"></div>
             ) : (
                 <div className="pointer-events-auto">
@@ -1304,7 +1281,6 @@ const PlayRound = () => {
                                    <Satellite className="text-white mb-1 animate-pulse" size={24} strokeWidth={1.5} />
                                 )}
                                 <span className="text-white font-bold text-[9px] uppercase tracking-wider">{teeButtonText}</span>
-                                
                                 {isTeePressing && (
                                     <div className="absolute bottom-0 left-0 h-1 bg-white/30 w-full">
                                         <div className="h-full bg-white animate-[width_3s_linear_forwards] w-0"></div>
