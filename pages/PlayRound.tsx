@@ -618,6 +618,7 @@ const PlayRound = () => {
   const replayPoints = useMemo(() => {
       if (!isReplay) return [];
       const pts = [hole.tee, hole.green, ...holeShots.map(s => s.to)];
+      // Filter out any 0,0 coordinates to prevent map zooming out to world view
       return pts.filter(p => p.lat !== 0 && p.lng !== 0);
   }, [isReplay, hole, holeShots]);
 
