@@ -1053,6 +1053,53 @@ const PlayRound = () => {
           </div>
       )}
 
+      {/* REPLAY HUD (Top Left) */}
+      {isReplay && (
+          <div className="absolute top-4 left-4 z-[900] flex flex-col gap-3 pointer-events-none animate-in slide-in-from-left-4 fade-in duration-300">
+              <button 
+                  onClick={() => navigate('/summary', { state: { round: replayRound } })}
+                  className="pointer-events-auto self-start bg-black/60 hover:bg-black/80 backdrop-blur-md text-white pl-3 pr-4 py-2 rounded-full border border-white/10 flex items-center gap-1 shadow-lg transition-all group"
+              >
+                  <ChevronLeft size={16} className="text-gray-400 group-hover:text-white transition-colors" />
+                  <span className="text-xs font-bold uppercase tracking-wider">Exit</span>
+              </button>
+
+              {/* Hole Score Detail */}
+              {(() => {
+                   const hScore = scorecard.find(h => h.holeNumber === hole.number);
+                   if (!hScore) return null;
+                   
+                   const total = hScore.shotsTaken + hScore.putts + hScore.penalties;
+                   const diff = total - hole.par;
+                   let scoreColor = 'text-white';
+                   if (diff < 0) scoreColor = 'text-red-400';
+                   else if (diff > 0) scoreColor = 'text-blue-400';
+
+                   return (
+                       <div className="pointer-events-auto bg-black/80 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl overflow-hidden min-w-[110px]">
+                           <div className="bg-white/5 px-3 py-2 flex items-center justify-between border-b border-white/5">
+                                <span className="text-sm font-black text-white">H{hole.number}</span>
+                                <span className="text-[10px] font-bold text-gray-400">PAR {hole.par}</span>
+                           </div>
+                           <div className="p-3 text-center">
+                                <div className={`text-4xl font-black leading-none mb-2 ${scoreColor}`}>{total}</div>
+                                <div className="grid grid-cols-2 gap-1 text-[9px] text-gray-400 font-bold uppercase text-left">
+                                    <div>Shot</div><div className="text-right text-gray-200">{hScore.shotsTaken}</div>
+                                    <div>Putt</div><div className="text-right text-gray-200">{hScore.putts}</div>
+                                    {hScore.penalties > 0 && (
+                                        <>
+                                            <div className="text-red-400">Pen</div>
+                                            <div className="text-right text-red-400">{hScore.penalties}</div>
+                                        </>
+                                    )}
+                                </div>
+                           </div>
+                       </div>
+                   );
+              })()}
+          </div>
+      )}
+
       {/* TOP RIGHT: TOOLS & MENU */}
       <div className="absolute top-0 right-0 p-4 z-[1000] pointer-events-none flex flex-col gap-3 items-end">
           <div className="pointer-events-auto flex flex-col gap-3 items-end">
@@ -1211,13 +1258,6 @@ const PlayRound = () => {
                 className="bg-gray-800/80 p-4 rounded-2xl text-white disabled:opacity-20 flex items-center gap-2 border border-white/5 active:scale-95 transition-all shadow-xl"
             >
                 <span className="font-bold text-xs uppercase tracking-widest">Next</span> <ArrowRight size={20}/>
-            </button>
-            
-            <button 
-                onClick={() => navigate('/summary', { state: { round: replayRound } })}
-                className="absolute top-[-60px] left-1/2 -translate-x-1/2 bg-gray-900 text-white px-4 py-2 rounded-full text-xs font-bold border border-gray-700 shadow-lg"
-            >
-                Exit Replay
             </button>
         </div>
       )}
