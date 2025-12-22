@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useContext, useMemo, useRef, Fragment } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Polyline, Polygon, useMap } from 'react-leaflet';
@@ -227,7 +226,7 @@ const GolfBagIcon = ({ size = 24, className = "" }: { size?: number, className?:
     strokeLinejoin="round" 
     className={className}
   >
-    <path d="M7 6h10v14a2 2 0 0 1-2 2H9a2 2 0 0 1-2 2H9a2 2 0 0 1-2 2H9a2 2 0 0 1-2 2H9a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V6z" />
+    <path d="M7 6h10v14a2 2 0 0 1-2 2H9a2 2 0 0 1-2 2H9a2 2 0 0 1-2 2H9a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V6z" />
     <path d="M9 6V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3" />
     <path d="M9 4l-2 2" />
     <path d="M15 4l2 2" />
@@ -793,9 +792,18 @@ const PlayRound = () => {
 
   const saveHoleScore = (totalScore: number, putts: number, pens: number) => {
     const newScore = { holeNumber: hole.number, par: hole.par, shotsTaken: Math.max(0, totalScore - putts - pens), putts, penalties: pens };
-    setScorecard(prev => [...prev.filter(s => s.holeNumber !== hole.number), newScore]);
+    
+    // Explicitly create the updated scorecard array to ensure finishRound gets the latest data
+    const updatedScorecard = [...scorecard.filter(s => s.holeNumber !== hole.number), newScore];
+    
+    setScorecard(updatedScorecard);
     setShowScoreModal(false);
-    if (currentHoleIdx < activeCourse.holes.length - 1) loadHole(currentHoleIdx + 1); else finishRound();
+    
+    if (currentHoleIdx < activeCourse.holes.length - 1) {
+        loadHole(currentHoleIdx + 1);
+    } else {
+        finishRound(updatedScorecard);
+    }
   };
 
   const loadHole = (idx: number) => {
@@ -810,9 +818,14 @@ const PlayRound = () => {
     setIsTrackingMode(false); setTrackingStartPos(null);
   };
 
-  const finishRound = () => {
+  const finishRound = (finalScorecard?: HoleScore[]) => {
     if(!user) return;
-    const history = { id: crypto.randomUUID(), date: new Date().toLocaleString(), courseName: activeCourse.name, scorecard, shots };
+    
+    // Use the passed finalScorecard if available (from saveHoleScore immediately finishing),
+    // otherwise fallback to state (e.g. manual finish from menu)
+    const cardToSave = finalScorecard || scorecard;
+    
+    const history = { id: crypto.randomUUID(), date: new Date().toLocaleString(), courseName: activeCourse.name, scorecard: cardToSave, shots };
     StorageService.saveHistory(user, history);
     StorageService.clearTempState(user);
     navigate('/summary', { state: { round: history } });
@@ -1262,7 +1275,7 @@ const PlayRound = () => {
 
       {showHoleSelect && <HoleSelectorModal holes={activeCourse.holes} currentIdx={currentHoleIdx} onSelect={loadHole} onClose={() => setShowHoleSelect(false)} />}
       {showScoreModal && <ScoreModal par={hole.par} holeNum={hole.number} recordedShots={Math.max(0, shotNum - 1)} onSave={saveHoleScore} onClose={() => setShowScoreModal(false)} />}
-      {showFullCard && <FullScorecardModal holes={activeCourse.holes} scorecard={scorecard} onFinishRound={finishRound} onClose={() => setShowFullCard(false)} />}
+      {showFullCard && <FullScorecardModal holes={activeCourse.holes} scorecard={scorecard} onFinishRound={() => finishRound()} onClose={() => setShowFullCard(false)} />}
       {pendingShot && <ShotConfirmModal dist={MathUtils.formatDistance(pendingShot.dist, useYards)} club={selectedClub} clubs={bag} isGPS={pendingShot.isGPS} isLongDistWarning={pendingShot.dist > 500} onChangeClub={setSelectedClub} onConfirm={confirmShot} onCancel={() => setPendingShot(null)} />}
       
       {showTextInput && (

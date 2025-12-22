@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { HashRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { User, LogOut, Play, Map as MapIcon, Settings as SettingsIcon } from 'lucide-react';
@@ -49,10 +50,14 @@ const MainLayout = ({ children }: { children?: ReactNode }) => {
 
   const isPlayMode = location.pathname.startsWith('/play');
   const isEditorMode = location.pathname.includes('/edit');
+  const isClubManagement = location.pathname === '/settings/clubs';
+
+  // Define full-screen modes where global nav/header is hidden
+  const showChrome = !isPlayMode && !isEditorMode && !isClubManagement;
 
   return (
     <div className="flex flex-col h-[100dvh] max-w-md mx-auto bg-black relative shadow-2xl overflow-hidden">
-      {!isPlayMode && !isEditorMode && (
+      {showChrome && (
         <header className="flex items-center justify-between p-4 bg-gray-900 border-b border-gray-800 z-10 shrink-0">
           <div className="flex items-center gap-2" onClick={() => navigate('/dashboard')}>
             <MapIcon className="text-green-500" />
@@ -68,7 +73,7 @@ const MainLayout = ({ children }: { children?: ReactNode }) => {
         {children}
       </main>
 
-      {!isPlayMode && !isEditorMode && (
+      {showChrome && (
         <nav className="flex justify-around items-center p-3 bg-gray-900 border-t border-gray-800 z-10 shrink-0 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
           <NavItem icon={<User size={24} />} label="Dash" path="/dashboard" active={location.pathname === '/dashboard'} />
           <div className="relative -top-5">
